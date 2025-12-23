@@ -1,0 +1,21 @@
+ID,Name,Type,Primary,Alternate,No Equipment
+1,Upper Traps,Pull,Shrugs,,Pike Press
+2,Mid/Lower Traps/Rhomboids,Pull,Bent-Over Rows,Seated Cable Rows,Inverted Rows
+3,Lats,Pull,Lat Pulldown,Pullups,Diamond pushups
+4,Shoulders (Posterior),Pull,Face Pulls,Reverse Flys,"Reverse Snow Angels, Prone Y-Raises"
+5,Biceps,Pull,Curls,Hammer Curls,"Chinups, Inverted Rows, Planks"
+6,Forearms,Pull,Wrist Curls,Reverse Wrist Curls,Dead hangs
+7,Erector Spinae,Legs,Deadlifts,Romanian Deadlifts,Superman Holds
+8,Glutes,Legs,Hip Thrusts,Bulgarian Split Squats,Glute Bridges
+9,Hamstrings,Legs,Leg Curls,,Nordic Curls
+10,Quads,Legs,Squats,Leg Press,Bodyweight Squats
+11,Calves,Legs,Standing Calf Raises,Seated Calf Raises,Glute Bridges
+12,Hip Adductors,Legs,Adductor Machine,Sumo Squats,Copenhagen Planks
+13,Hip Abductors,Legs,Abductor Machine,Cable Hip Abduction,Side Leg Raises
+14,Shoulders (Lateral),Push,Lateral Raises,Cable Lateral Raises,Side Plank Raises
+15,Shoulders (Anterior),Push,Overhead Presses,Arnold Presses,Pike Pushups
+16,Chest,Push,Bench Press,Dumbell Press,"Pushups, Scapular Pushups"
+17,Triceps,Push,Dips,Skull Crushers,Diamon Pushups
+18,Upper Abs,Core,Crunches,Cable Crunches,Crunches
+19,Lower Abs,Core,Leg Raises,Reverse Crunches,Leg Raises
+20,Obliques,Core,Russian Twists,Side Bends,Side Planks

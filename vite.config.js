@@ -14,9 +14,9 @@ export default defineConfig({
 			},
 
 			manifest: {
-				name: "boilerplate.patrickdwyer.com",
-				short_name: "boilerplate.patrickdwyer.com",
-				description: "Boilerplate repository for personal projects.",
+				name: "gym.patrickdwyer.com",
+				short_name: "gym.patrickdwyer.com",
+				description: "gym.patrickdwyer.com is a platform for tracking my gym progress",
 				theme_color: "#D3D3FF",
 			},
 
