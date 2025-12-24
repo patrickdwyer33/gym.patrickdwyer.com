@@ -5,20 +5,6 @@ import { authenticate } from '../middleware/auth.js';
 
 const router = express.Router();
 
-// Single admin user - password only (no username needed)
-const ADMIN_PASSWORD_HASH = process.env.ADMIN_PASSWORD_HASH;
-const JWT_SECRET = process.env.JWT_SECRET;
-
-// Validate environment variables on startup
-if (!ADMIN_PASSWORD_HASH) {
-  console.error('⚠️  ADMIN_PASSWORD_HASH not set in .env');
-  console.error('Run: npm run hash-password yourPassword');
-}
-if (!JWT_SECRET) {
-  console.error('⚠️  JWT_SECRET not set in .env');
-  console.error('Run: npm run generate-jwt-secret');
-}
-
 /**
  * POST /api/auth/login
  * Login with password only (single admin user)
@@ -30,6 +16,10 @@ router.post('/login', async (req, res) => {
     if (!password) {
       return res.status(400).json({ error: 'Password required' });
     }
+
+    // Read env vars at request time (after dotenv has loaded)
+    const ADMIN_PASSWORD_HASH = process.env.ADMIN_PASSWORD_HASH;
+    const JWT_SECRET = process.env.JWT_SECRET;
 
     if (!ADMIN_PASSWORD_HASH) {
       console.error('ADMIN_PASSWORD_HASH not configured');

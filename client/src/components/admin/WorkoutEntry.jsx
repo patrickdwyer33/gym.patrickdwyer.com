@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { useSync } from '../../contexts/SyncContext';
 import { useWorkout } from '../../hooks/useWorkout';
 import { useWorkoutMutations } from '../../hooks/useWorkoutData';
 import { useRestTimer, requestNotificationPermission } from '../../hooks/useRestTimer';
@@ -8,6 +9,7 @@ import { formatReadableDate, formatTime } from '../../lib/utils/formatters';
 
 export default function WorkoutEntry() {
   const { logout } = useAuth();
+  const { syncNow, syncing, lastSync } = useSync();
   const navigate = useNavigate();
   const { workout, loading: workoutLoading, error, refetch } = useWorkout();
   const { createSession, createSet } = useWorkoutMutations();
@@ -127,7 +129,16 @@ export default function WorkoutEntry() {
     <div className="workout-entry">
       <div className="admin-header">
         <h1>Day {dayNumber}: {exerciseGroup.name}</h1>
-        <button onClick={handleLogout} className="logout-btn">Logout</button>
+        <div className="admin-actions">
+          <button
+            onClick={syncNow}
+            className="sync-btn"
+            disabled={syncing}
+          >
+            {syncing ? 'Syncing...' : 'Sync Now'}
+          </button>
+          <button onClick={handleLogout} className="logout-btn">Logout</button>
+        </div>
       </div>
 
       <p className="date">{formatReadableDate(workout.date)}</p>

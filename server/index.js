@@ -1,16 +1,23 @@
+import dotenv from 'dotenv';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+
+// Load environment variables FIRST, before any other imports
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const envPath = join(__dirname, '..', '.env');
+dotenv.config({ path: envPath });
+
+// Now import everything else after env vars are loaded
 import express from 'express';
 import { createServer } from 'http';
 import cors from 'cors';
 import morgan from 'morgan';
-import dotenv from 'dotenv';
 import authRoutes from './routes/auth.js';
 import workoutRoutes from './routes/workouts.js';
 import syncRoutes from './routes/sync.js';
 import configRoutes from './routes/config.js';
 import errorHandler from './middleware/errorHandler.js';
-
-// Load environment variables
-dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3001;
