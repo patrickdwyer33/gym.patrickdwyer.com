@@ -43,7 +43,8 @@ export async function initDB() {
     try {
       await seedStaticData();
     } catch (error) {
-      console.warn('Could not seed static data (offline?):', error);
+      console.error('Failed to seed static data:', error);
+      throw error; // Re-throw so we can see the full error
     }
   }
 
@@ -56,6 +57,12 @@ export async function initDB() {
 export async function seedStaticData() {
   const { configAPI } = await import('../api/client.js');
   const data = await configAPI.getStaticData();
+
+  console.log('Seeding static data:', {
+    exercises: data.exercises.length,
+    exerciseGroups: data.exerciseGroups.length,
+    schedule: data.schedule.length,
+  });
 
   // Insert exercises
   data.exercises.forEach((ex) => {
@@ -95,8 +102,21 @@ export async function seedStaticData() {
     );
   });
 
+  // Set default cycle start date to today if not already set
+  const today = new Date().toISOString().split('T')[0];
+  db.run(
+    `INSERT OR IGNORE INTO app_config (key, value, updated_at)
+     VALUES (?, ?, ?)`,
+    ['cycle_start_date', today, new Date().toISOString()]
+  );
+
   await saveDBToIndexedDB();
   console.log('Static data seeded from server');
+
+  // Verify what was seeded
+  const exerciseCount = query('SELECT COUNT(*) as count FROM exercises')[0].count;
+  const scheduleCount = query('SELECT COUNT(*) as count FROM schedule')[0].count;
+  console.log(`Verified: ${exerciseCount} exercises, ${scheduleCount} schedule entries`);
 }
 
 /**

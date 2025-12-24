@@ -46,6 +46,8 @@ export function useWorkout(date = null) {
       // Calculate day number
       const dayNumber = calculateDayNumber(dateStr, cycleStartDate);
 
+      console.log('Workout query debug:', { dateStr, cycleStartDate, dayNumber });
+
       // Get exercise group for this day
       const scheduleRow = query(
         `SELECT eg.*,
@@ -64,10 +66,16 @@ export function useWorkout(date = null) {
       )[0];
 
       if (!scheduleRow) {
+        console.error('No workout found for day', dayNumber);
+        // Debug: check what's in the schedule table
+        const allSchedule = query('SELECT * FROM schedule');
+        console.log('Schedule table contents:', allSchedule);
         setError('No workout found for this day');
         setWorkout(null);
         return;
       }
+
+      console.log('Found workout for day', dayNumber, scheduleRow);
 
       // Get session for this date if it exists
       const session = query(
