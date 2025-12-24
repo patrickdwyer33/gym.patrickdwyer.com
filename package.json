@@ -10,7 +10,9 @@
     "seed": "node server/db/seed.js",
     "build": "vite build --config client/vite.config.js",
     "preview": "vite preview --config client/vite.config.js",
-    "postinstall": "cp node_modules/sql.js/dist/sql-wasm.wasm client/public/"
+    "postinstall": "cp node_modules/sql.js/dist/sql-wasm.wasm client/public/",
+    "hash-password": "node scripts/hash-password.js",
+    "generate-jwt-secret": "node scripts/generate-jwt-secret.js"
   },
   "devDependencies": {
     "@vite-pwa/assets-generator": "^0.2.6",
@@ -38,7 +40,6 @@
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
     "react-router-dom": "^7.11.0",
-    "sql.js": "^1.13.0",
-    "ws": "^8.18.3"
+    "sql.js": "^1.13.0"
   }
 }

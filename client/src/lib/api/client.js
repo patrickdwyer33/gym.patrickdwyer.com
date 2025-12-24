@@ -57,10 +57,10 @@ export async function fetchAPI(endpoint, options = {}) {
  * Auth API calls
  */
 export const authAPI = {
-  login: async (username, password) => {
+  login: async (password) => {
     const data = await fetchAPI('/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ username, password }),
+      body: JSON.stringify({ password }),
     });
 
     if (data.token) {

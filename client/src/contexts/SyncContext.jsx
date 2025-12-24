@@ -9,9 +9,6 @@ export function SyncProvider({ children }) {
   const [syncing, setSyncing] = useState(false);
   const [dbReady, setDbReady] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
-  const [wsConnected, setWsConnected] = useState(false);
-  const wsRef = useRef(null);
-  const reconnectTimeoutRef = useRef(null);
 
   // Initialize local database
   useEffect(() => {
@@ -24,86 +21,6 @@ export function SyncProvider({ children }) {
         console.error('Failed to initialize local database:', error);
       });
   }, []);
-
-  // WebSocket connection
-  const connectWebSocket = useCallback(() => {
-    if (!isOnline || !dbReady) return;
-
-    const wsUrl = `ws://localhost:3001/ws`;
-    console.log('Connecting to WebSocket:', wsUrl);
-
-    const ws = new WebSocket(wsUrl);
-    wsRef.current = ws;
-
-    ws.onopen = () => {
-      console.log('WebSocket connected');
-      setWsConnected(true);
-      ws.send(JSON.stringify({ type: 'subscribe' }));
-      // Do initial pull when connected
-      pullUpdates();
-    };
-
-    ws.onmessage = (event) => {
-      try {
-        const message = JSON.parse(event.data);
-        console.log('WebSocket message:', message);
-
-        if (message.type === 'db_change') {
-          console.log('Database changed on server - pulling updates');
-          pullUpdates();
-        }
-      } catch (error) {
-        console.error('WebSocket message error:', error);
-      }
-    };
-
-    ws.onclose = () => {
-      console.log('WebSocket disconnected');
-      setWsConnected(false);
-      wsRef.current = null;
-
-      // Attempt to reconnect after 5 seconds
-      if (isOnline) {
-        console.log('Reconnecting in 5 seconds...');
-        reconnectTimeoutRef.current = setTimeout(connectWebSocket, 5000);
-      }
-    };
-
-    ws.onerror = (error) => {
-      console.error('WebSocket error:', error);
-    };
-  }, [isOnline, dbReady]);
-
-  // Monitor online/offline status
-  useEffect(() => {
-    const handleOnline = () => {
-      setIsOnline(true);
-      console.log('App is online - connecting WebSocket...');
-      connectWebSocket();
-    };
-
-    const handleOffline = () => {
-      setIsOnline(false);
-      console.log('App is offline');
-      if (wsRef.current) {
-        wsRef.current.close();
-      }
-    };
-
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-      if (reconnectTimeoutRef.current) {
-        clearTimeout(reconnectTimeoutRef.current);
-      }
-      if (wsRef.current) {
-        wsRef.current.close();
-      }
-    };
-  }, [connectWebSocket]);
 
   // Pull updates from server and merge into local DB
   const pullUpdates = useCallback(async () => {
@@ -243,32 +160,36 @@ export function SyncProvider({ children }) {
     }
   }, [dbReady, isOnline]);
 
-  // Auto-sync: pull every 30 seconds, push immediately after local changes
-  useEffect(() => {
-    if (!dbReady || !isOnline) return;
-
-    // Initial sync
-    pullUpdates();
-
-    // Set up interval for periodic pull
-    const interval = setInterval(pullUpdates, 30000);
-
-    return () => clearInterval(interval);
-  }, [pullUpdates, dbReady, isOnline]);
-
-  // Initialize WebSocket connection when DB is ready
+  // Do initial sync when DB is ready and online (only once)
   useEffect(() => {
     if (dbReady && isOnline) {
-      connectWebSocket();
+      console.log('App ready - doing initial sync...');
+      pushUpdates()
+        .then(() => pullUpdates())
+        .catch((error) => console.error('Initial sync error:', error));
     }
-  }, [dbReady, isOnline, connectWebSocket]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dbReady, isOnline]); // Only run when dbReady/isOnline change, not when sync functions change
+
+  // Monitor online/offline status
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   const value = {
     lastSync,
     syncing,
     dbReady,
     isOnline,
-    wsConnected,
     pullUpdates,
     pushUpdates,
     syncNow: async () => {

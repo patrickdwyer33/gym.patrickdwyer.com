@@ -8,7 +8,6 @@ import workoutRoutes from './routes/workouts.js';
 import syncRoutes from './routes/sync.js';
 import configRoutes from './routes/config.js';
 import errorHandler from './middleware/errorHandler.js';
-import { initWebSocketServer } from './websocket.js';
 
 // Load environment variables
 dotenv.config();
@@ -43,12 +42,8 @@ app.use(errorHandler);
 // Create HTTP server
 const server = createServer(app);
 
-// Initialize WebSocket server
-initWebSocketServer(server);
-
 // Start server
 server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
-  console.log(`WebSocket server running on ws://localhost:${PORT}/ws`);
   console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
 });

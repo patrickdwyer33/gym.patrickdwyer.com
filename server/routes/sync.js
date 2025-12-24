@@ -1,7 +1,6 @@
 import express from 'express';
 import { getAll, run } from '../db/database.js';
 import { authenticate } from '../middleware/auth.js';
-import { broadcastChange } from '../websocket.js';
 
 const router = express.Router();
 
@@ -88,15 +87,6 @@ router.post('/push', authenticate, async (req, res) => {
       conflicts,
       timestamp: new Date().toISOString(),
     };
-
-    // Broadcast changes to all connected WebSocket clients
-    if (synced > 0) {
-      broadcastChange('sync', {
-        sessions: sessions.length,
-        sets: sets.length,
-        timestamp: response.timestamp,
-      });
-    }
 
     res.json(response);
   } catch (error) {
