@@ -4,3 +4,10 @@ dist
 dev-dist
 sample-pdf.pdf
 tmp
+
+# Environment variables
+.env
+
+# Database
+server/db/*.db
+server/db/*.db-*
