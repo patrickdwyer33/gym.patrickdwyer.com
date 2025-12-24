@@ -1,4 +1,4 @@
-import { createContext, useState, useEffect, useContext, useCallback } from 'react';
+import { createContext, useState, useEffect, useContext, useCallback, useRef } from 'react';
 import { syncAPI } from '../lib/api/client';
 import { initDB, query, run, saveDBToIndexedDB } from '../lib/db/localDB';
 
@@ -9,6 +9,9 @@ export function SyncProvider({ children }) {
   const [syncing, setSyncing] = useState(false);
   const [dbReady, setDbReady] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [wsConnected, setWsConnected] = useState(false);
+  const wsRef = useRef(null);
+  const reconnectTimeoutRef = useRef(null);
 
   // Initialize local database
   useEffect(() => {
@@ -22,17 +25,69 @@ export function SyncProvider({ children }) {
       });
   }, []);
 
+  // WebSocket connection
+  const connectWebSocket = useCallback(() => {
+    if (!isOnline || !dbReady) return;
+
+    const wsUrl = `ws://localhost:3001/ws`;
+    console.log('Connecting to WebSocket:', wsUrl);
+
+    const ws = new WebSocket(wsUrl);
+    wsRef.current = ws;
+
+    ws.onopen = () => {
+      console.log('WebSocket connected');
+      setWsConnected(true);
+      ws.send(JSON.stringify({ type: 'subscribe' }));
+      // Do initial pull when connected
+      pullUpdates();
+    };
+
+    ws.onmessage = (event) => {
+      try {
+        const message = JSON.parse(event.data);
+        console.log('WebSocket message:', message);
+
+        if (message.type === 'db_change') {
+          console.log('Database changed on server - pulling updates');
+          pullUpdates();
+        }
+      } catch (error) {
+        console.error('WebSocket message error:', error);
+      }
+    };
+
+    ws.onclose = () => {
+      console.log('WebSocket disconnected');
+      setWsConnected(false);
+      wsRef.current = null;
+
+      // Attempt to reconnect after 5 seconds
+      if (isOnline) {
+        console.log('Reconnecting in 5 seconds...');
+        reconnectTimeoutRef.current = setTimeout(connectWebSocket, 5000);
+      }
+    };
+
+    ws.onerror = (error) => {
+      console.error('WebSocket error:', error);
+    };
+  }, [isOnline, dbReady]);
+
   // Monitor online/offline status
   useEffect(() => {
     const handleOnline = () => {
       setIsOnline(true);
-      console.log('App is online - syncing...');
-      pullUpdates();
+      console.log('App is online - connecting WebSocket...');
+      connectWebSocket();
     };
 
     const handleOffline = () => {
       setIsOnline(false);
       console.log('App is offline');
+      if (wsRef.current) {
+        wsRef.current.close();
+      }
     };
 
     window.addEventListener('online', handleOnline);
@@ -41,8 +96,14 @@ export function SyncProvider({ children }) {
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+      }
+      if (wsRef.current) {
+        wsRef.current.close();
+      }
     };
-  }, []);
+  }, [connectWebSocket]);
 
   // Pull updates from server and merge into local DB
   const pullUpdates = useCallback(async () => {
@@ -195,11 +256,19 @@ export function SyncProvider({ children }) {
     return () => clearInterval(interval);
   }, [pullUpdates, dbReady, isOnline]);
 
+  // Initialize WebSocket connection when DB is ready
+  useEffect(() => {
+    if (dbReady && isOnline) {
+      connectWebSocket();
+    }
+  }, [dbReady, isOnline, connectWebSocket]);
+
   const value = {
     lastSync,
     syncing,
     dbReady,
     isOnline,
+    wsConnected,
     pullUpdates,
     pushUpdates,
     syncNow: async () => {

@@ -135,11 +135,7 @@ export function useWorkout(date = null) {
 
   useEffect(() => {
     fetchWorkout();
-
-    // Refresh when sync completes (no polling needed - sync handles it)
-    const interval = setInterval(fetchWorkout, 30000); // Refresh every 30s
-
-    return () => clearInterval(interval);
+    // No interval needed - workout will refresh when sync updates happen
   }, [fetchWorkout]);
 
   return { workout, loading, error, refetch: fetchWorkout };
