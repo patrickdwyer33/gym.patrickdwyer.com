@@ -57,22 +57,13 @@ export default defineConfig({
 		},
 	},
 
-	// Ensure WASM support for SQL.js
 	optimizeDeps: {
-		exclude: ["sql.js"],
+		include: ["sql.js"],
 	},
 
 	build: {
-		rollupOptions: {
-			output: {
-				// Ensure SQL.js WASM file is copied
-				assetFileNames: (assetInfo) => {
-					if (assetInfo.name === "sql-wasm.wasm") {
-						return "sql-wasm.wasm";
-					}
-					return "assets/[name]-[hash][extname]";
-				},
-			},
+		commonjsOptions: {
+			include: ["sql.js"],
 		},
 	},
 });

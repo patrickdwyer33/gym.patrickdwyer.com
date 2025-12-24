@@ -136,6 +136,10 @@ export const workoutAPI = {
  * Config API calls
  */
 export const configAPI = {
+  getStaticData: async () => {
+    return fetchAPI('/config/static-data');
+  },
+
   getCycleStart: async () => {
     return fetchAPI('/config/cycle-start');
   },

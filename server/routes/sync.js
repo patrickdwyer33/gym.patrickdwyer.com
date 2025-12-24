@@ -10,31 +10,74 @@ const router = express.Router();
  */
 router.post('/push', authenticate, async (req, res) => {
   try {
-    const { changes } = req.body;
-
-    if (!Array.isArray(changes)) {
-      return res.status(400).json({ error: 'Changes must be an array' });
-    }
+    const { sessions = [], sets = [] } = req.body;
 
     let synced = 0;
     let failed = 0;
     const conflicts = [];
 
-    for (const change of changes) {
+    // Sync sessions
+    for (const session of sessions) {
       try {
-        const { table_name, record_id, operation, data } = change;
-
-        if (operation === 'insert' || operation === 'update') {
-          // For simplicity, we'll handle this at the set/session level
-          // In a real implementation, you'd apply each change individually
-          synced++;
-        } else if (operation === 'delete') {
-          synced++;
-        }
+        run(
+          `INSERT OR REPLACE INTO workout_sessions (
+            id, session_date, day_number, exercise_group_id, status,
+            notes, started_at, completed_at, created_at, updated_at,
+            sync_version, last_synced_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            session.id,
+            session.session_date,
+            session.day_number,
+            session.exercise_group_id,
+            session.status,
+            session.notes,
+            session.started_at,
+            session.completed_at,
+            session.created_at,
+            session.updated_at,
+            (session.sync_version || 0) + 1,
+            new Date().toISOString(),
+          ]
+        );
+        synced++;
       } catch (error) {
-        console.error('Sync change error:', error);
+        console.error('Sync session error:', error);
         failed++;
-        conflicts.push({ change, error: error.message });
+        conflicts.push({ type: 'session', id: session.id, error: error.message });
+      }
+    }
+
+    // Sync sets
+    for (const set of sets) {
+      try {
+        run(
+          `INSERT OR REPLACE INTO workout_sets (
+            id, session_id, exercise_id, set_number, reps, weight,
+            duration_seconds, notes, completed, created_at, updated_at,
+            sync_version, last_synced_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            set.id,
+            set.session_id,
+            set.exercise_id,
+            set.set_number,
+            set.reps,
+            set.weight,
+            set.duration_seconds,
+            set.notes,
+            set.completed,
+            set.created_at,
+            set.updated_at,
+            (set.sync_version || 0) + 1,
+            new Date().toISOString(),
+          ]
+        );
+        synced++;
+      } catch (error) {
+        console.error('Sync set error:', error);
+        failed++;
+        conflicts.push({ type: 'set', id: set.id, error: error.message });
       }
     }
 
@@ -42,7 +85,7 @@ router.post('/push', authenticate, async (req, res) => {
       synced,
       failed,
       conflicts,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
   } catch (error) {
     console.error('Push sync error:', error);

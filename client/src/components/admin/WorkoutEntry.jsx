@@ -2,14 +2,15 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useWorkout } from '../../hooks/useWorkout';
+import { useWorkoutMutations } from '../../hooks/useWorkoutData';
 import { useRestTimer, requestNotificationPermission } from '../../hooks/useRestTimer';
-import { workoutAPI } from '../../lib/api/client';
 import { formatReadableDate, formatTime } from '../../lib/utils/formatters';
 
 export default function WorkoutEntry() {
   const { logout } = useAuth();
   const navigate = useNavigate();
-  const { workout, loading: workoutLoading, error } = useWorkout();
+  const { workout, loading: workoutLoading, error, refetch } = useWorkout();
+  const { createSession, createSet } = useWorkoutMutations();
   const [session, setSession] = useState(null);
   const [sets, setSets] = useState([]);
   const [currentExerciseId, setCurrentExerciseId] = useState(null);
@@ -46,13 +47,15 @@ export default function WorkoutEntry() {
     if (!workout) return;
 
     try {
-      const result = await workoutAPI.createSession(
+      const newSession = await createSession(
         workout.date,
         workout.dayNumber,
         workout.exerciseGroup.id
       );
-      setSession(result.session);
+      setSession(newSession);
       setCurrentExerciseId(workout.exerciseGroup.exercises[0].id);
+      // Refetch to get updated data
+      refetch();
     } catch (err) {
       console.error('Failed to create session:', err);
     }
@@ -70,7 +73,7 @@ export default function WorkoutEntry() {
     setSubmitting(true);
 
     try {
-      const result = await workoutAPI.createSet({
+      const newSet = await createSet({
         sessionId: session.id,
         exerciseId: currentExerciseId,
         setNumber: currentSetNumber,
@@ -80,9 +83,12 @@ export default function WorkoutEntry() {
         completed: true,
       });
 
-      setSets([...sets, result.set]);
+      setSets([...sets, newSet]);
       setCurrentSetNumber(currentSetNumber + 1);
       setNotes('');
+
+      // Refetch to get updated data
+      refetch();
 
       // Start rest timer
       reset();

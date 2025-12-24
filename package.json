@@ -9,7 +9,8 @@
     "dev:all": "concurrently \"npm run dev\" \"npm run dev:server\"",
     "seed": "node server/db/seed.js",
     "build": "vite build --config client/vite.config.js",
-    "preview": "vite preview --config client/vite.config.js"
+    "preview": "vite preview --config client/vite.config.js",
+    "postinstall": "cp node_modules/sql.js/dist/sql-wasm.wasm client/public/"
   },
   "devDependencies": {
     "@vite-pwa/assets-generator": "^0.2.6",

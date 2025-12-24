@@ -1,9 +1,30 @@
 import express from 'express';
-import { getOne, run } from '../db/database.js';
+import { getOne, getAll, run } from '../db/database.js';
 import { calculateDayNumber } from '../utils/dayCalculator.js';
 import { authenticate } from '../middleware/auth.js';
 
 const router = express.Router();
+
+/**
+ * GET /api/config/static-data
+ * Get all static reference data (exercises, groups, schedule)
+ */
+router.get('/static-data', (req, res) => {
+  try {
+    const exercises = getAll('SELECT * FROM exercises ORDER BY id');
+    const exerciseGroups = getAll('SELECT * FROM exercise_groups ORDER BY id');
+    const schedule = getAll('SELECT * FROM schedule ORDER BY day_number');
+
+    res.json({
+      exercises,
+      exerciseGroups,
+      schedule,
+    });
+  } catch (error) {
+    console.error('Get static data error:', error);
+    res.status(500).json({ error: 'Failed to get static data' });
+  }
+});
 
 /**
  * GET /api/config/cycle-start
