@@ -1,5 +1,6 @@
 import { useWorkout } from '../../hooks/useWorkout';
 import { formatReadableDate, formatWeight, formatReps } from '../../lib/utils/formatters';
+import ExerciseCarousel from '../shared/ExerciseCarousel';
 
 export default function TodayWorkout() {
   const { workout, loading, error } = useWorkout();
@@ -16,7 +17,37 @@ export default function TodayWorkout() {
     return <div>No workout found</div>;
   }
 
-  const { date, dayNumber, exerciseGroup, session, sets } = workout;
+  const { date, dayNumber, exerciseGroup, session, sets, selectedExercises } = workout;
+
+  // No session - not started
+  if (!session) {
+    return (
+      <div className="today-workout">
+        <div className="workout-header">
+          <h2>Day {dayNumber}: {exerciseGroup.name}</h2>
+          <p className="date">{formatReadableDate(date)}</p>
+        </div>
+        <div className="no-session">
+          <p>No workout logged yet today.</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Session exists but no exercises selected
+  if (!selectedExercises || selectedExercises.length === 0) {
+    return (
+      <div className="today-workout">
+        <div className="workout-header">
+          <h2>Day {dayNumber}: {exerciseGroup.name}</h2>
+          <p className="date">{formatReadableDate(date)}</p>
+        </div>
+        <div className="session-status">
+          <p>Workout in progress - exercises not selected yet.</p>
+        </div>
+      </div>
+    );
+  }
 
   // Group sets by exercise
   const setsByExercise = sets.reduce((acc, set) => {
@@ -27,6 +58,9 @@ export default function TodayWorkout() {
     return acc;
   }, {});
 
+  const selectedExercise1 = selectedExercises[0];
+  const selectedExercise2 = selectedExercises[1];
+
   return (
     <div className="today-workout">
       <div className="workout-header">
@@ -35,45 +69,65 @@ export default function TodayWorkout() {
       </div>
 
       <div className="exercises">
-        {exerciseGroup.exercises.map((exercise, idx) => (
-          <div key={exercise.id} className="exercise-card">
-            <h3>Exercise {idx + 1}: {exercise.name}</h3>
-            <div className="exercise-variants">
-              <p><strong>Primary:</strong> {exercise.primaryVariant}</p>
-              <p><strong>Alternate:</strong> {exercise.alternateVariant}</p>
-              <p><strong>No Equipment:</strong> {exercise.noEquipmentVariant}</p>
-            </div>
+        {/* Locked carousel for selected exercise 1 */}
+        <div style={{ marginBottom: '2rem' }}>
+          <ExerciseCarousel
+            exercises={exerciseGroup.muscleGroups[0].exercises}
+            selectedId={selectedExercise1.exercise_id}
+            locked={true}
+            muscleGroup={selectedExercise1.muscle_group}
+          />
 
-            {setsByExercise[exercise.id] && (
-              <div className="sets-completed">
-                <h4>Sets Completed:</h4>
-                <div className="sets-list">
-                  {setsByExercise[exercise.id].map((set) => (
-                    <div key={set.id} className="set-item">
-                      <span className="set-number">Set {set.set_number}:</span>
-                      <span className="set-details">
-                        {formatReps(set.reps)} × {formatWeight(set.weight)}
-                        {set.notes && <span className="set-notes"> - {set.notes}</span>}
-                      </span>
-                    </div>
-                  ))}
-                </div>
+          {setsByExercise[selectedExercise1.exercise_id] && (
+            <div className="sets-completed">
+              <h4>Sets Completed:</h4>
+              <div className="sets-list">
+                {setsByExercise[selectedExercise1.exercise_id].map((set) => (
+                  <div key={set.id} className="set-item">
+                    <span className="set-number">Set {set.set_number}:</span>
+                    <span className="set-details">
+                      {formatReps(set.reps)} × {formatWeight(set.weight)}
+                      {set.notes && <span className="set-notes"> - {set.notes}</span>}
+                    </span>
+                  </div>
+                ))}
               </div>
-            )}
-          </div>
-        ))}
+            </div>
+          )}
+        </div>
+
+        {/* Locked carousel for selected exercise 2 */}
+        <div style={{ marginBottom: '2rem' }}>
+          <ExerciseCarousel
+            exercises={exerciseGroup.muscleGroups[1].exercises}
+            selectedId={selectedExercise2.exercise_id}
+            locked={true}
+            muscleGroup={selectedExercise2.muscle_group}
+          />
+
+          {setsByExercise[selectedExercise2.exercise_id] && (
+            <div className="sets-completed">
+              <h4>Sets Completed:</h4>
+              <div className="sets-list">
+                {setsByExercise[selectedExercise2.exercise_id].map((set) => (
+                  <div key={set.id} className="set-item">
+                    <span className="set-number">Set {set.set_number}:</span>
+                    <span className="set-details">
+                      {formatReps(set.reps)} × {formatWeight(set.weight)}
+                      {set.notes && <span className="set-notes"> - {set.notes}</span>}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       {session && (
         <div className="session-status">
           <p>Status: <strong>{session.status}</strong></p>
           {session.notes && <p>Notes: {session.notes}</p>}
-        </div>
-      )}
-
-      {!session && (
-        <div className="no-session">
-          <p>No workout logged yet today.</p>
         </div>
       )}
     </div>

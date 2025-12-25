@@ -2,27 +2,40 @@
 CREATE TABLE IF NOT EXISTS exercises (
     id INTEGER PRIMARY KEY,
     name TEXT NOT NULL,
+    muscle_group TEXT NOT NULL,
     type TEXT NOT NULL CHECK(type IN ('Pull', 'Push', 'Legs', 'Core')),
-    primary_variant TEXT,
-    alternate_variant TEXT,
-    no_equipment_variant TEXT,
+    equipment_level TEXT CHECK(equipment_level IN ('full', 'minimal', 'none')),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS exercise_groups (
     id INTEGER PRIMARY KEY,
     name TEXT NOT NULL,
-    exercise1_id INTEGER NOT NULL,
-    exercise2_id INTEGER NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (exercise1_id) REFERENCES exercises(id),
-    FOREIGN KEY (exercise2_id) REFERENCES exercises(id)
+    muscle_group1 TEXT NOT NULL,
+    muscle_group2 TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS schedule (
     day_number INTEGER PRIMARY KEY CHECK(day_number BETWEEN 1 AND 10),
     workout_id INTEGER NOT NULL,
     FOREIGN KEY (workout_id) REFERENCES exercise_groups(id)
+);
+
+-- Junction table to track which exercises were selected for each session
+CREATE TABLE IF NOT EXISTS session_exercises (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id INTEGER NOT NULL,
+    muscle_group TEXT NOT NULL,
+    exercise_id INTEGER NOT NULL,
+    selection_order INTEGER NOT NULL CHECK(selection_order IN (1, 2)),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    -- Sync tracking
+    sync_version INTEGER DEFAULT 0,
+    last_synced_at TIMESTAMP,
+    FOREIGN KEY (session_id) REFERENCES workout_sessions(id) ON DELETE CASCADE,
+    FOREIGN KEY (exercise_id) REFERENCES exercises(id),
+    UNIQUE(session_id, selection_order)
 );
 
 -- User data (dynamic, synced)
@@ -90,3 +103,4 @@ CREATE INDEX IF NOT EXISTS idx_workout_sessions_day ON workout_sessions(day_numb
 CREATE INDEX IF NOT EXISTS idx_workout_sets_session ON workout_sets(session_id);
 CREATE INDEX IF NOT EXISTS idx_workout_sets_updated ON workout_sets(updated_at);
 CREATE INDEX IF NOT EXISTS idx_workout_sessions_updated ON workout_sessions(updated_at);
+CREATE INDEX IF NOT EXISTS idx_session_exercises_session ON session_exercises(session_id);

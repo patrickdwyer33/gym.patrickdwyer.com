@@ -20,18 +20,17 @@ console.log('Database schema created successfully');
 const exercisesCsv = fs.readFileSync(join(__dirname, '../../data/exercises.csv'), 'utf8');
 const exercises = parse(exercisesCsv, { columns: true, skip_empty_lines: true });
 const insertExercise = db.prepare(`
-  INSERT OR REPLACE INTO exercises (id, name, type, primary_variant, alternate_variant, no_equipment_variant)
-  VALUES (?, ?, ?, ?, ?, ?)
+  INSERT OR REPLACE INTO exercises (id, name, muscle_group, type, equipment_level)
+  VALUES (?, ?, ?, ?, ?)
 `);
 
 exercises.forEach(ex => {
   insertExercise.run(
     ex.ID,
     ex.Name,
+    ex.MuscleGroup,
     ex.Type,
-    ex.Primary,
-    ex.Alternate,
-    ex['No Equipment']
+    ex.EquipmentLevel
   );
 });
 
@@ -41,7 +40,7 @@ console.log(`Imported ${exercises.length} exercises`);
 const groupsCsv = fs.readFileSync(join(__dirname, '../../data/exercise-groups.csv'), 'utf8');
 const groups = parse(groupsCsv, { columns: true, skip_empty_lines: true });
 const insertGroup = db.prepare(`
-  INSERT OR REPLACE INTO exercise_groups (id, name, exercise1_id, exercise2_id)
+  INSERT OR REPLACE INTO exercise_groups (id, name, muscle_group1, muscle_group2)
   VALUES (?, ?, ?, ?)
 `);
 
@@ -49,8 +48,8 @@ groups.forEach(group => {
   insertGroup.run(
     group.ID,
     group.Name,
-    group['Exercise 1'],
-    group['Exercise 2']
+    group.MuscleGroup1,
+    group.MuscleGroup2
   );
 });
 

@@ -50,17 +50,9 @@ export function useWorkout(date = null) {
 
       // Get exercise group for this day
       const scheduleRow = query(
-        `SELECT eg.*,
-                e1.id as ex1_id, e1.name as ex1_name, e1.type as ex1_type,
-                e1.primary_variant as ex1_primary, e1.alternate_variant as ex1_alternate,
-                e1.no_equipment_variant as ex1_no_equipment,
-                e2.id as ex2_id, e2.name as ex2_name, e2.type as ex2_type,
-                e2.primary_variant as ex2_primary, e2.alternate_variant as ex2_alternate,
-                e2.no_equipment_variant as ex2_no_equipment
+        `SELECT eg.*
          FROM schedule s
          JOIN exercise_groups eg ON s.workout_id = eg.id
-         JOIN exercises e1 ON eg.exercise1_id = e1.id
-         JOIN exercises e2 ON eg.exercise2_id = e2.id
          WHERE s.day_number = ?`,
         [dayNumber]
       )[0];
@@ -77,11 +69,42 @@ export function useWorkout(date = null) {
 
       console.log('Found workout for day', dayNumber, scheduleRow);
 
+      // Get ALL exercises for muscle_group1
+      const muscleGroup1Exercises = query(
+        `SELECT id, name, muscle_group, type, equipment_level
+         FROM exercises
+         WHERE muscle_group = ?
+         ORDER BY equipment_level DESC, name`,
+        [scheduleRow.muscle_group1]
+      );
+
+      // Get ALL exercises for muscle_group2
+      const muscleGroup2Exercises = query(
+        `SELECT id, name, muscle_group, type, equipment_level
+         FROM exercises
+         WHERE muscle_group = ?
+         ORDER BY equipment_level DESC, name`,
+        [scheduleRow.muscle_group2]
+      );
+
       // Get session for this date if it exists
       const session = query(
         'SELECT * FROM workout_sessions WHERE session_date = ?',
         [dateStr]
       )[0] || null;
+
+      // Get selected exercises if session exists
+      let selectedExercises = [];
+      if (session) {
+        selectedExercises = query(
+          `SELECT se.*, e.name, e.muscle_group, e.type, e.equipment_level
+           FROM session_exercises se
+           JOIN exercises e ON se.exercise_id = e.id
+           WHERE se.session_id = ?
+           ORDER BY se.selection_order`,
+          [session.id]
+        );
+      }
 
       // Get sets for this session if it exists
       let sets = [];
@@ -98,22 +121,14 @@ export function useWorkout(date = null) {
       const exerciseGroup = {
         id: scheduleRow.id,
         name: scheduleRow.name,
-        exercises: [
+        muscleGroups: [
           {
-            id: scheduleRow.ex1_id,
-            name: scheduleRow.ex1_name,
-            type: scheduleRow.ex1_type,
-            primaryVariant: scheduleRow.ex1_primary,
-            alternateVariant: scheduleRow.ex1_alternate,
-            noEquipmentVariant: scheduleRow.ex1_no_equipment,
+            name: scheduleRow.muscle_group1,
+            exercises: muscleGroup1Exercises,
           },
           {
-            id: scheduleRow.ex2_id,
-            name: scheduleRow.ex2_name,
-            type: scheduleRow.ex2_type,
-            primaryVariant: scheduleRow.ex2_primary,
-            alternateVariant: scheduleRow.ex2_alternate,
-            noEquipmentVariant: scheduleRow.ex2_no_equipment,
+            name: scheduleRow.muscle_group2,
+            exercises: muscleGroup2Exercises,
           },
         ],
       };
@@ -122,6 +137,7 @@ export function useWorkout(date = null) {
         date: dateStr,
         dayNumber,
         exerciseGroup,
+        selectedExercises,
         session,
         sets,
       });

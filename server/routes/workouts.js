@@ -22,17 +22,9 @@ router.get('/today', async (req, res) => {
 
     // Get exercise group for this day
     const scheduleRow = getOne(`
-      SELECT eg.*,
-             e1.id as ex1_id, e1.name as ex1_name, e1.type as ex1_type,
-             e1.primary_variant as ex1_primary, e1.alternate_variant as ex1_alternate,
-             e1.no_equipment_variant as ex1_no_equipment,
-             e2.id as ex2_id, e2.name as ex2_name, e2.type as ex2_type,
-             e2.primary_variant as ex2_primary, e2.alternate_variant as ex2_alternate,
-             e2.no_equipment_variant as ex2_no_equipment
+      SELECT eg.*
       FROM schedule s
       JOIN exercise_groups eg ON s.workout_id = eg.id
-      JOIN exercises e1 ON eg.exercise1_id = e1.id
-      JOIN exercises e2 ON eg.exercise2_id = e2.id
       WHERE s.day_number = ?
     `, [dayNumber]);
 
@@ -40,11 +32,39 @@ router.get('/today', async (req, res) => {
       return res.status(404).json({ error: 'No workout found for this day' });
     }
 
+    // Get ALL exercises for muscle_group1
+    const muscleGroup1Exercises = getAll(`
+      SELECT id, name, muscle_group, type, equipment_level
+      FROM exercises
+      WHERE muscle_group = ?
+      ORDER BY equipment_level DESC, name
+    `, [scheduleRow.muscle_group1]);
+
+    // Get ALL exercises for muscle_group2
+    const muscleGroup2Exercises = getAll(`
+      SELECT id, name, muscle_group, type, equipment_level
+      FROM exercises
+      WHERE muscle_group = ?
+      ORDER BY equipment_level DESC, name
+    `, [scheduleRow.muscle_group2]);
+
     // Get session for this date if it exists
     const session = getOne(`
       SELECT * FROM workout_sessions
       WHERE session_date = ?
     `, [date]);
+
+    // Get selected exercises if session exists
+    let selectedExercises = [];
+    if (session) {
+      selectedExercises = getAll(`
+        SELECT se.*, e.name, e.muscle_group, e.type, e.equipment_level
+        FROM session_exercises se
+        JOIN exercises e ON se.exercise_id = e.id
+        WHERE se.session_id = ?
+        ORDER BY se.selection_order
+      `, [session.id]);
+    }
 
     // Get sets for this session if it exists
     let sets = [];
@@ -60,22 +80,14 @@ router.get('/today', async (req, res) => {
     const exerciseGroup = {
       id: scheduleRow.id,
       name: scheduleRow.name,
-      exercises: [
+      muscleGroups: [
         {
-          id: scheduleRow.ex1_id,
-          name: scheduleRow.ex1_name,
-          type: scheduleRow.ex1_type,
-          primaryVariant: scheduleRow.ex1_primary,
-          alternateVariant: scheduleRow.ex1_alternate,
-          noEquipmentVariant: scheduleRow.ex1_no_equipment
+          name: scheduleRow.muscle_group1,
+          exercises: muscleGroup1Exercises
         },
         {
-          id: scheduleRow.ex2_id,
-          name: scheduleRow.ex2_name,
-          type: scheduleRow.ex2_type,
-          primaryVariant: scheduleRow.ex2_primary,
-          alternateVariant: scheduleRow.ex2_alternate,
-          noEquipmentVariant: scheduleRow.ex2_no_equipment
+          name: scheduleRow.muscle_group2,
+          exercises: muscleGroup2Exercises
         }
       ]
     };
@@ -84,6 +96,7 @@ router.get('/today', async (req, res) => {
       date,
       dayNumber,
       exerciseGroup,
+      selectedExercises,
       session,
       sets
     });
@@ -185,6 +198,81 @@ router.post('/session', authenticate, async (req, res) => {
       return res.status(409).json({ error: 'Session already exists for this date' });
     }
     res.status(500).json({ error: 'Failed to create session' });
+  }
+});
+
+/**
+ * POST /api/workouts/session/:id/select-exercises
+ * Select exercises for a workout session (admin only)
+ */
+router.post('/session/:id/select-exercises', authenticate, async (req, res) => {
+  try {
+    const sessionId = req.params.id;
+    const { exercise1Id, exercise2Id } = req.body;
+
+    if (!exercise1Id || !exercise2Id) {
+      return res.status(400).json({ error: 'Both exercise IDs required' });
+    }
+
+    // Get session to verify it exists and get exercise group
+    const session = getOne(`
+      SELECT ws.*, eg.muscle_group1, eg.muscle_group2
+      FROM workout_sessions ws
+      JOIN exercise_groups eg ON ws.exercise_group_id = eg.id
+      WHERE ws.id = ?
+    `, [sessionId]);
+
+    if (!session) {
+      return res.status(404).json({ error: 'Session not found' });
+    }
+
+    // Get the exercises to validate they match the muscle groups
+    const exercise1 = getOne('SELECT * FROM exercises WHERE id = ?', [exercise1Id]);
+    const exercise2 = getOne('SELECT * FROM exercises WHERE id = ?', [exercise2Id]);
+
+    if (!exercise1 || !exercise2) {
+      return res.status(404).json({ error: 'One or both exercises not found' });
+    }
+
+    // Validate exercises match the session's muscle groups
+    if (exercise1.muscle_group !== session.muscle_group1) {
+      return res.status(400).json({
+        error: `Exercise 1 must be from muscle group: ${session.muscle_group1}`
+      });
+    }
+    if (exercise2.muscle_group !== session.muscle_group2) {
+      return res.status(400).json({
+        error: `Exercise 2 must be from muscle group: ${session.muscle_group2}`
+      });
+    }
+
+    // Delete existing selections
+    run('DELETE FROM session_exercises WHERE session_id = ?', [sessionId]);
+
+    // Insert new selections
+    run(`
+      INSERT INTO session_exercises (session_id, muscle_group, exercise_id, selection_order)
+      VALUES (?, ?, ?, 1)
+    `, [sessionId, exercise1.muscle_group, exercise1Id]);
+
+    run(`
+      INSERT INTO session_exercises (session_id, muscle_group, exercise_id, selection_order)
+      VALUES (?, ?, ?, 2)
+    `, [sessionId, exercise2.muscle_group, exercise2Id]);
+
+    // Get the selections to return
+    const selectedExercises = getAll(`
+      SELECT se.*, e.name, e.muscle_group, e.type, e.equipment_level
+      FROM session_exercises se
+      JOIN exercises e ON se.exercise_id = e.id
+      WHERE se.session_id = ?
+      ORDER BY se.selection_order
+    `, [sessionId]);
+
+    res.json({ selectedExercises });
+  } catch (error) {
+    console.error('Select exercises error:', error);
+    res.status(500).json({ error: 'Failed to select exercises' });
   }
 });
 

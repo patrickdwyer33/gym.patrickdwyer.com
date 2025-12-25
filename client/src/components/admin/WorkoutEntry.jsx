@@ -6,21 +6,32 @@ import { useWorkout } from '../../hooks/useWorkout';
 import { useWorkoutMutations } from '../../hooks/useWorkoutData';
 import { useRestTimer, requestNotificationPermission } from '../../hooks/useRestTimer';
 import { formatReadableDate, formatTime } from '../../lib/utils/formatters';
+import ExerciseCarousel from '../shared/ExerciseCarousel';
 
 export default function WorkoutEntry() {
   const { logout } = useAuth();
-  const { syncNow, syncing, lastSync } = useSync();
+  const { syncNow, syncing } = useSync();
   const navigate = useNavigate();
   const { workout, loading: workoutLoading, error, refetch } = useWorkout();
-  const { createSession, createSet } = useWorkoutMutations();
+  const { createSession, createSet, selectExercises } = useWorkoutMutations();
+
+  // Session state
   const [session, setSession] = useState(null);
   const [sets, setSets] = useState([]);
+
+  // Phase 1: Exercise selection state
+  const [selectedExercise1Id, setSelectedExercise1Id] = useState(null);
+  const [selectedExercise2Id, setSelectedExercise2Id] = useState(null);
+  const [confirmingSelection, setConfirmingSelection] = useState(false);
+
+  // Phase 2: Workout entry state
   const [currentExerciseId, setCurrentExerciseId] = useState(null);
   const [currentSetNumber, setCurrentSetNumber] = useState(1);
   const [reps, setReps] = useState(12);
   const [weight, setWeight] = useState(45);
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
   const { timeRemaining, isRunning, isComplete, start, pause, reset, setDuration } = useRestTimer(90);
 
   // Request notification permission on mount
@@ -34,9 +45,14 @@ export default function WorkoutEntry() {
       if (workout.session) {
         setSession(workout.session);
         setSets(workout.sets || []);
-        // Set current exercise to first exercise if no sets yet
-        if (!workout.sets || workout.sets.length === 0) {
-          setCurrentExerciseId(workout.exerciseGroup.exercises[0].id);
+
+        // If exercises are selected, set current exercise to first selected
+        if (workout.selectedExercises && workout.selectedExercises.length > 0) {
+          setCurrentExerciseId(workout.selectedExercises[0].exercise_id);
+          setSelectedExercise1Id(workout.selectedExercises[0].exercise_id);
+          if (workout.selectedExercises.length > 1) {
+            setSelectedExercise2Id(workout.selectedExercises[1].exercise_id);
+          }
         }
       } else {
         // Create a new session
@@ -55,11 +71,29 @@ export default function WorkoutEntry() {
         workout.exerciseGroup.id
       );
       setSession(newSession);
-      setCurrentExerciseId(workout.exerciseGroup.exercises[0].id);
-      // Refetch to get updated data
       refetch();
     } catch (err) {
       console.error('Failed to create session:', err);
+    }
+  };
+
+  const handleConfirmSelection = async () => {
+    if (!session || !selectedExercise1Id || !selectedExercise2Id) return;
+
+    setConfirmingSelection(true);
+    try {
+      await selectExercises(session.id, selectedExercise1Id, selectedExercise2Id);
+
+      // Set current exercise to first selected
+      setCurrentExerciseId(selectedExercise1Id);
+
+      // Refetch to get updated data with selections
+      await refetch();
+    } catch (err) {
+      console.error('Failed to select exercises:', err);
+      alert(`Failed to select exercises: ${err.message}`);
+    } finally {
+      setConfirmingSelection(false);
     }
   };
 
@@ -119,8 +153,95 @@ export default function WorkoutEntry() {
     return <div>No workout session available</div>;
   }
 
-  const { exerciseGroup, dayNumber } = workout;
-  const currentExercise = exerciseGroup.exercises.find((ex) => ex.id === currentExerciseId);
+  const { exerciseGroup, dayNumber, selectedExercises } = workout;
+  const hasSelectedExercises = selectedExercises && selectedExercises.length === 2;
+
+  // Debug logging
+  console.log('Workout data:', workout);
+  console.log('Exercise group:', exerciseGroup);
+  console.log('Muscle groups:', exerciseGroup?.muscleGroups);
+
+  // Phase 1: Exercise Selection
+  if (!hasSelectedExercises) {
+    const muscleGroup1 = exerciseGroup.muscleGroups?.[0];
+    const muscleGroup2 = exerciseGroup.muscleGroups?.[1];
+    const canConfirm = selectedExercise1Id && selectedExercise2Id;
+
+    console.log('Muscle group 1:', muscleGroup1);
+    console.log('Muscle group 2:', muscleGroup2);
+
+    // Safety check for muscle groups
+    if (!muscleGroup1 || !muscleGroup2) {
+      return (
+        <div className="error">
+          <p>Error: Muscle groups not loaded correctly.</p>
+          <p>exerciseGroup.muscleGroups: {JSON.stringify(exerciseGroup?.muscleGroups)}</p>
+          <button onClick={refetch}>Retry</button>
+        </div>
+      );
+    }
+
+    return (
+      <div className="workout-entry">
+        <div className="admin-header">
+          <h1>Day {dayNumber}: {exerciseGroup.name}</h1>
+          <div className="admin-actions">
+            <button onClick={syncNow} className="sync-btn" disabled={syncing}>
+              {syncing ? 'Syncing...' : 'Sync Now'}
+            </button>
+            <button onClick={handleLogout} className="logout-btn">Logout</button>
+          </div>
+        </div>
+
+        <p className="date">{formatReadableDate(workout.date)}</p>
+
+        <div style={{ marginBottom: '2rem', textAlign: 'center' }}>
+          <h2>Select Your Exercises</h2>
+          <p>Choose one exercise from each carousel, then confirm to begin your workout.</p>
+        </div>
+
+        {/* Carousel for muscle group 1 */}
+        <ExerciseCarousel
+          exercises={muscleGroup1.exercises}
+          selectedId={selectedExercise1Id}
+          onSelect={setSelectedExercise1Id}
+          locked={false}
+          muscleGroup={muscleGroup1.name}
+        />
+
+        {/* Carousel for muscle group 2 */}
+        <ExerciseCarousel
+          exercises={muscleGroup2.exercises}
+          selectedId={selectedExercise2Id}
+          onSelect={setSelectedExercise2Id}
+          locked={false}
+          muscleGroup={muscleGroup2.name}
+        />
+
+        <button
+          onClick={handleConfirmSelection}
+          disabled={!canConfirm || confirmingSelection}
+          style={{
+            width: '100%',
+            padding: '1rem',
+            fontSize: '1.125rem',
+            marginTop: '1rem',
+          }}
+        >
+          {confirmingSelection ? 'Confirming...' : 'Confirm Exercise Selection'}
+        </button>
+
+        <div className="navigation-links">
+          <a href="/">← View Public Page</a>
+        </div>
+      </div>
+    );
+  }
+
+  // Phase 2: Workout Entry
+  const selectedExercise1 = selectedExercises[0];
+  const selectedExercise2 = selectedExercises[1];
+  const currentExercise = selectedExercises.find((ex) => ex.exercise_id === currentExerciseId);
 
   // Get sets for current exercise
   const currentExerciseSets = sets.filter((s) => s.exercise_id === currentExerciseId);
@@ -130,11 +251,7 @@ export default function WorkoutEntry() {
       <div className="admin-header">
         <h1>Day {dayNumber}: {exerciseGroup.name}</h1>
         <div className="admin-actions">
-          <button
-            onClick={syncNow}
-            className="sync-btn"
-            disabled={syncing}
-          >
+          <button onClick={syncNow} className="sync-btn" disabled={syncing}>
             {syncing ? 'Syncing...' : 'Sync Now'}
           </button>
           <button onClick={handleLogout} className="logout-btn">Logout</button>
@@ -145,28 +262,39 @@ export default function WorkoutEntry() {
 
       {/* Exercise Selection */}
       <div className="exercise-selector">
-        {exerciseGroup.exercises.map((exercise, idx) => (
-          <button
-            key={exercise.id}
-            className={`exercise-btn ${currentExerciseId === exercise.id ? 'active' : ''}`}
-            onClick={() => {
-              setCurrentExerciseId(exercise.id);
-              const exerciseSets = sets.filter((s) => s.exercise_id === exercise.id);
-              setCurrentSetNumber(exerciseSets.length + 1);
-            }}
-          >
-            Exercise {idx + 1}: {exercise.name}
-          </button>
-        ))}
+        <button
+          className={`exercise-btn ${currentExerciseId === selectedExercise1.exercise_id ? 'active' : ''}`}
+          onClick={() => {
+            setCurrentExerciseId(selectedExercise1.exercise_id);
+            const exerciseSets = sets.filter((s) => s.exercise_id === selectedExercise1.exercise_id);
+            setCurrentSetNumber(exerciseSets.length + 1);
+          }}
+        >
+          {selectedExercise1.muscle_group}: {selectedExercise1.name}
+        </button>
+        <button
+          className={`exercise-btn ${currentExerciseId === selectedExercise2.exercise_id ? 'active' : ''}`}
+          onClick={() => {
+            setCurrentExerciseId(selectedExercise2.exercise_id);
+            const exerciseSets = sets.filter((s) => s.exercise_id === selectedExercise2.exercise_id);
+            setCurrentSetNumber(exerciseSets.length + 1);
+          }}
+        >
+          {selectedExercise2.muscle_group}: {selectedExercise2.name}
+        </button>
       </div>
 
       {/* Current Exercise Info */}
       {currentExercise && (
         <div className="current-exercise">
           <h2>{currentExercise.name}</h2>
-          <div className="exercise-variants">
-            <p><strong>Primary:</strong> {currentExercise.primaryVariant}</p>
-            <p><strong>Alternate:</strong> {currentExercise.alternateVariant}</p>
+          <div className="exercise-meta">
+            <span className={`equipment-badge equipment-${currentExercise.equipment_level}`}>
+              {currentExercise.equipment_level === 'full' && 'Full Equipment'}
+              {currentExercise.equipment_level === 'minimal' && 'Minimal Equipment'}
+              {currentExercise.equipment_level === 'none' && 'No Equipment'}
+            </span>
+            <span className="exercise-type">{currentExercise.type}</span>
           </div>
         </div>
       )}

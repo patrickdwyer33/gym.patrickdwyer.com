@@ -236,11 +236,78 @@ export function useWorkoutMutations() {
     [pushUpdates]
   );
 
+  const selectExercises = useCallback(
+    async (sessionId, exercise1Id, exercise2Id) => {
+      try {
+        const now = new Date().toISOString();
+
+        // Get session to get muscle groups for validation
+        const session = query(
+          `SELECT ws.*, eg.muscle_group1, eg.muscle_group2
+           FROM workout_sessions ws
+           JOIN exercise_groups eg ON ws.exercise_group_id = eg.id
+           WHERE ws.id = ?`,
+          [sessionId]
+        )[0];
+
+        if (!session) {
+          throw new Error('Session not found');
+        }
+
+        // Get exercises to get muscle groups
+        const exercise1 = query('SELECT * FROM exercises WHERE id = ?', [exercise1Id])[0];
+        const exercise2 = query('SELECT * FROM exercises WHERE id = ?', [exercise2Id])[0];
+
+        if (!exercise1 || !exercise2) {
+          throw new Error('One or both exercises not found');
+        }
+
+        // Delete existing selections
+        run('DELETE FROM session_exercises WHERE session_id = ?', [sessionId]);
+
+        // Insert new selections
+        run(
+          `INSERT INTO session_exercises (
+            session_id, muscle_group, exercise_id, selection_order,
+            created_at, sync_version
+          ) VALUES (?, ?, ?, 1, ?, 0)`,
+          [sessionId, exercise1.muscle_group, exercise1Id, now]
+        );
+
+        run(
+          `INSERT INTO session_exercises (
+            session_id, muscle_group, exercise_id, selection_order,
+            created_at, sync_version
+          ) VALUES (?, ?, ?, 2, ?, 0)`,
+          [sessionId, exercise2.muscle_group, exercise2Id, now]
+        );
+
+        await saveDBToIndexedDB();
+        await pushUpdates(); // Sync to server
+
+        // Return the selections
+        return query(
+          `SELECT se.*, e.name, e.muscle_group, e.type, e.equipment_level
+           FROM session_exercises se
+           JOIN exercises e ON se.exercise_id = e.id
+           WHERE se.session_id = ?
+           ORDER BY se.selection_order`,
+          [sessionId]
+        );
+      } catch (error) {
+        console.error('Failed to select exercises:', error);
+        throw error;
+      }
+    },
+    [pushUpdates]
+  );
+
   return {
     createSession,
     updateSession,
     createSet,
     updateSet,
     deleteSet,
+    selectExercises,
   };
 }
