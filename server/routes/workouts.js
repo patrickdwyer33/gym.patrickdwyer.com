@@ -34,18 +34,18 @@ router.get('/today', async (req, res) => {
 
     // Get ALL exercises for muscle_group1
     const muscleGroup1Exercises = getAll(`
-      SELECT id, name, muscle_group, type, equipment_level
+      SELECT id, name, muscle_group, type
       FROM exercises
       WHERE muscle_group = ?
-      ORDER BY equipment_level DESC, name
+      ORDER BY name
     `, [scheduleRow.muscle_group1]);
 
     // Get ALL exercises for muscle_group2
     const muscleGroup2Exercises = getAll(`
-      SELECT id, name, muscle_group, type, equipment_level
+      SELECT id, name, muscle_group, type
       FROM exercises
       WHERE muscle_group = ?
-      ORDER BY equipment_level DESC, name
+      ORDER BY name
     `, [scheduleRow.muscle_group2]);
 
     // Get session for this date if it exists
@@ -58,7 +58,7 @@ router.get('/today', async (req, res) => {
     let selectedExercises = [];
     if (session) {
       selectedExercises = getAll(`
-        SELECT se.*, e.name, e.muscle_group, e.type, e.equipment_level
+        SELECT se.*, e.name, e.muscle_group, e.type
         FROM session_exercises se
         JOIN exercises e ON se.exercise_id = e.id
         WHERE se.session_id = ?
@@ -262,7 +262,7 @@ router.post('/session/:id/select-exercises', authenticate, async (req, res) => {
 
     // Get the selections to return
     const selectedExercises = getAll(`
-      SELECT se.*, e.name, e.muscle_group, e.type, e.equipment_level
+      SELECT se.*, e.name, e.muscle_group, e.type
       FROM session_exercises se
       JOIN exercises e ON se.exercise_id = e.id
       WHERE se.session_id = ?

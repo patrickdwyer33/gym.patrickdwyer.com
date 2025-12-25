@@ -71,19 +71,19 @@ export function useWorkout(date = null) {
 
       // Get ALL exercises for muscle_group1
       const muscleGroup1Exercises = query(
-        `SELECT id, name, muscle_group, type, equipment_level
+        `SELECT id, name, muscle_group, type
          FROM exercises
          WHERE muscle_group = ?
-         ORDER BY equipment_level DESC, name`,
+         ORDER BY name`,
         [scheduleRow.muscle_group1]
       );
 
       // Get ALL exercises for muscle_group2
       const muscleGroup2Exercises = query(
-        `SELECT id, name, muscle_group, type, equipment_level
+        `SELECT id, name, muscle_group, type
          FROM exercises
          WHERE muscle_group = ?
-         ORDER BY equipment_level DESC, name`,
+         ORDER BY name`,
         [scheduleRow.muscle_group2]
       );
 
@@ -97,7 +97,7 @@ export function useWorkout(date = null) {
       let selectedExercises = [];
       if (session) {
         selectedExercises = query(
-          `SELECT se.*, e.name, e.muscle_group, e.type, e.equipment_level
+          `SELECT se.*, e.name, e.muscle_group, e.type
            FROM session_exercises se
            JOIN exercises e ON se.exercise_id = e.id
            WHERE se.session_id = ?

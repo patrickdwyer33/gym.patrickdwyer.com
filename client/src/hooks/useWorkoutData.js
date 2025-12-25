@@ -287,7 +287,7 @@ export function useWorkoutMutations() {
 
         // Return the selections
         return query(
-          `SELECT se.*, e.name, e.muscle_group, e.type, e.equipment_level
+          `SELECT se.*, e.name, e.muscle_group, e.type
            FROM session_exercises se
            JOIN exercises e ON se.exercise_id = e.id
            WHERE se.session_id = ?

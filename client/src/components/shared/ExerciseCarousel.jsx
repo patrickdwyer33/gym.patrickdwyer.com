@@ -111,11 +111,6 @@ export default function ExerciseCarousel({
                 <div className="carousel-card">
                   <h4 className="exercise-name">{exercise.name}</h4>
                   <div className="exercise-meta">
-                    <span className={`equipment-badge equipment-${exercise.equipment_level}`}>
-                      {exercise.equipment_level === 'full' && 'Full Equipment'}
-                      {exercise.equipment_level === 'minimal' && 'Minimal Equipment'}
-                      {exercise.equipment_level === 'none' && 'No Equipment'}
-                    </span>
                     <span className="exercise-type">{exercise.type}</span>
                   </div>
                 </div>

@@ -4,7 +4,6 @@ CREATE TABLE IF NOT EXISTS exercises (
     name TEXT NOT NULL,
     muscle_group TEXT NOT NULL,
     type TEXT NOT NULL CHECK(type IN ('Pull', 'Push', 'Legs', 'Core')),
-    equipment_level TEXT CHECK(equipment_level IN ('full', 'minimal', 'none')),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

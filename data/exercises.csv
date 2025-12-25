@@ -1,59 +1,59 @@
-ID,Name,MuscleGroup,Type,EquipmentLevel
-1,Shrugs,Upper Traps,Pull,full
-2,Pike Press,Upper Traps,Pull,none
-3,Bent-Over Rows,Mid/Lower Traps,Pull,full
-4,Seated Cable Rows,Mid/Lower Traps,Pull,full
-5,Inverted Rows,Mid/Lower Traps,Pull,none
-6,Lat Pulldown,Lats,Pull,full
-7,Pull-ups,Lats,Pull,none
-8,Diamond Push-ups,Lats,Pull,none
-9,Face Pulls,Posterior Deltoids,Pull,full
-10,Reverse Flys,Posterior Deltoids,Pull,full
-11,Reverse Snow Angels,Posterior Deltoids,Pull,none
-12,Curls,Biceps,Pull,full
-13,Hammer Curls,Biceps,Pull,full
-14,Chin-ups,Biceps,Pull,none
-15,Wrist Curls,Forearms,Pull,full
-16,Reverse Wrist Curls,Forearms,Pull,full
-17,Dead Hangs,Forearms,Pull,none
-18,Deadlifts,Erector Spinae,Legs,full
-19,Romanian Deadlifts,Erector Spinae,Legs,full
-20,Superman Holds,Erector Spinae,Legs,none
-21,Hip Thrusts,Glutes,Legs,full
-22,Bulgarian Split Squats,Glutes,Legs,minimal
-23,Glute Bridges,Glutes,Legs,none
-24,Leg Curls,Hamstrings,Legs,full
-25,Nordic Curls,Hamstrings,Legs,none
-26,Squats,Quads,Legs,full
-27,Leg Press,Quads,Legs,full
-28,Bodyweight Squats,Quads,Legs,none
-29,Standing Calf Raises,Calves,Legs,full
-30,Seated Calf Raises,Calves,Legs,full
-31,Calf Raises (Bodyweight),Calves,Legs,none
-32,Adductor Machine,Hip Adductors,Legs,full
-33,Sumo Squats,Hip Adductors,Legs,minimal
-34,Copenhagen Planks,Hip Adductors,Legs,none
-35,Abductor Machine,Hip Abductors,Legs,full
-36,Cable Hip Abduction,Hip Abductors,Legs,full
-37,Side Leg Raises,Hip Abductors,Legs,none
-38,Lateral Raises,Lateral Deltoids,Push,full
-39,Cable Lateral Raises,Lateral Deltoids,Push,full
-40,Side Plank Raises,Lateral Deltoids,Push,none
-41,Overhead Presses,Anterior Deltoids,Push,full
-42,Arnold Presses,Anterior Deltoids,Push,full
-43,Pike Push-ups,Anterior Deltoids,Push,none
-44,Bench Press,Chest,Push,full
-45,Dumbbell Press,Chest,Push,minimal
-46,Push-ups,Chest,Push,none
-47,Dips,Triceps,Push,minimal
-48,Skull Crushers,Triceps,Push,full
-49,Diamond Push-ups,Triceps,Push,none
-50,Crunches,Upper Abs,Core,none
-51,Cable Crunches,Upper Abs,Core,full
-52,Sit-ups,Upper Abs,Core,none
-53,Leg Raises,Lower Abs,Core,none
-54,Reverse Crunches,Lower Abs,Core,none
-55,Hanging Leg Raises,Lower Abs,Core,minimal
-56,Russian Twists,Obliques,Core,none
-57,Side Bends,Obliques,Core,minimal
-58,Side Planks,Obliques,Core,none
+ID,Name,MuscleGroup,Type
+1,Shrugs,Upper Traps,Pull
+2,Pike Press,Upper Traps,Pull
+3,Bent-Over Rows,Mid/Lower Traps,Pull
+4,Seated Cable Rows,Mid/Lower Traps,Pull
+5,Inverted Rows,Mid/Lower Traps,Pull
+6,Lat Pulldown,Lats,Pull
+7,Pull-ups,Lats,Pull
+8,Diamond Push-ups,Lats,Pull
+9,Face Pulls,Posterior Deltoids,Pull
+10,Reverse Flys,Posterior Deltoids,Pull
+11,Reverse Snow Angels,Posterior Deltoids,Pull
+12,Curls,Biceps,Pull
+13,Hammer Curls,Biceps,Pull
+14,Chin-ups,Biceps,Pull
+15,Wrist Curls,Forearms,Pull
+16,Reverse Wrist Curls,Forearms,Pull
+17,Dead Hangs,Forearms,Pull
+18,Deadlifts,Erector Spinae,Legs
+19,Romanian Deadlifts,Erector Spinae,Legs
+20,Superman Holds,Erector Spinae,Legs
+21,Hip Thrusts,Glutes,Legs
+22,Bulgarian Split Squats,Glutes,Legs
+23,Glute Bridges,Glutes,Legs
+24,Leg Curls,Hamstrings,Legs
+25,Nordic Curls,Hamstrings,Legs
+26,Squats,Quads,Legs
+27,Leg Press,Quads,Legs
+28,Bodyweight Squats,Quads,Legs
+29,Standing Calf Raises,Calves,Legs
+30,Seated Calf Raises,Calves,Legs
+31,Calf Raises (Bodyweight),Calves,Legs
+32,Adductor Machine,Hip Adductors,Legs
+33,Sumo Squats,Hip Adductors,Legs
+34,Copenhagen Planks,Hip Adductors,Legs
+35,Abductor Machine,Hip Abductors,Legs
+36,Cable Hip Abduction,Hip Abductors,Legs
+37,Side Leg Raises,Hip Abductors,Legs
+38,Lateral Raises,Lateral Deltoids,Push
+39,Cable Lateral Raises,Lateral Deltoids,Push
+40,Side Plank Raises,Lateral Deltoids,Push
+41,Overhead Presses,Anterior Deltoids,Push
+42,Arnold Presses,Anterior Deltoids,Push
+43,Pike Push-ups,Anterior Deltoids,Push
+44,Bench Press,Chest,Push
+45,Dumbbell Press,Chest,Push
+46,Push-ups,Chest,Push
+47,Dips,Triceps,Push
+48,Skull Crushers,Triceps,Push
+49,Diamond Push-ups,Triceps,Push
+50,Crunches,Upper Abs,Core
+51,Cable Crunches,Upper Abs,Core
+52,Sit-ups,Upper Abs,Core
+53,Leg Raises,Lower Abs,Core
+54,Reverse Crunches,Lower Abs,Core
+55,Hanging Leg Raises,Lower Abs,Core
+56,Russian Twists,Obliques,Core
+57,Side Bends,Obliques,Core
+58,Side Planks,Obliques,Core

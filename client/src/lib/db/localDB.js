@@ -68,14 +68,13 @@ export async function seedStaticData() {
   data.exercises.forEach((ex) => {
     db.run(
       `INSERT OR REPLACE INTO exercises (
-        id, name, muscle_group, type, equipment_level, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?)`,
+        id, name, muscle_group, type, created_at
+      ) VALUES (?, ?, ?, ?, ?)`,
       [
         ex.id,
         ex.name,
         ex.muscle_group,
         ex.type,
-        ex.equipment_level,
         ex.created_at,
       ]
     );
@@ -128,7 +127,6 @@ async function initSchema() {
       name TEXT NOT NULL,
       muscle_group TEXT NOT NULL,
       type TEXT NOT NULL CHECK(type IN ('Pull', 'Push', 'Legs', 'Core')),
-      equipment_level TEXT CHECK(equipment_level IN ('full', 'minimal', 'none')),
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
 

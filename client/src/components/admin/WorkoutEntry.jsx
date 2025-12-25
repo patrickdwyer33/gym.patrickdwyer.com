@@ -289,11 +289,6 @@ export default function WorkoutEntry() {
         <div className="current-exercise">
           <h2>{currentExercise.name}</h2>
           <div className="exercise-meta">
-            <span className={`equipment-badge equipment-${currentExercise.equipment_level}`}>
-              {currentExercise.equipment_level === 'full' && 'Full Equipment'}
-              {currentExercise.equipment_level === 'minimal' && 'Minimal Equipment'}
-              {currentExercise.equipment_level === 'none' && 'No Equipment'}
-            </span>
             <span className="exercise-type">{currentExercise.type}</span>
           </div>
         </div>

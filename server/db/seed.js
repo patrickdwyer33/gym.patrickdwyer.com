@@ -20,8 +20,8 @@ console.log('Database schema created successfully');
 const exercisesCsv = fs.readFileSync(join(__dirname, '../../data/exercises.csv'), 'utf8');
 const exercises = parse(exercisesCsv, { columns: true, skip_empty_lines: true });
 const insertExercise = db.prepare(`
-  INSERT OR REPLACE INTO exercises (id, name, muscle_group, type, equipment_level)
-  VALUES (?, ?, ?, ?, ?)
+  INSERT OR REPLACE INTO exercises (id, name, muscle_group, type)
+  VALUES (?, ?, ?, ?)
 `);
 
 exercises.forEach(ex => {
@@ -29,8 +29,7 @@ exercises.forEach(ex => {
     ex.ID,
     ex.Name,
     ex.MuscleGroup,
-    ex.Type,
-    ex.EquipmentLevel
+    ex.Type
   );
 });
 
