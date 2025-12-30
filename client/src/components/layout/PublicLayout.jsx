@@ -28,7 +28,6 @@ export default function PublicLayout() {
         <Outlet />
       </main>
       <footer>
-        <p>&copy; 2025 Patrick's Gym Tracker</p>
       </footer>
     </div>
   );
