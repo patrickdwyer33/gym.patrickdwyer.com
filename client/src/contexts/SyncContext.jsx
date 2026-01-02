@@ -42,15 +42,12 @@ export function SyncProvider({ children }) {
           // Insert or update session
           run(
             `INSERT OR REPLACE INTO workout_sessions (
-              id, session_date, day_number, exercise_group_id, status,
-              notes, started_at, completed_at, created_at, updated_at,
-              sync_version, last_synced_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+              id, session_date, status, notes, started_at, completed_at,
+              created_at, updated_at, sync_version, last_synced_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
               session.id,
               session.session_date,
-              session.day_number,
-              session.exercise_group_id,
               session.status,
               session.notes,
               session.started_at,
@@ -63,6 +60,64 @@ export function SyncProvider({ children }) {
           );
         }
       });
+
+      // Merge session days into local DB
+      if (updates.sessionDays) {
+        updates.sessionDays.forEach((sessionDay) => {
+          const existing = query(
+            'SELECT sync_version FROM session_days WHERE id = ?',
+            [sessionDay.id]
+          )[0];
+
+          if (!existing || existing.sync_version < sessionDay.sync_version) {
+            run(
+              `INSERT OR REPLACE INTO session_days (
+                id, session_id, day_number, exercise_group_id,
+                created_at, sync_version, last_synced_at
+              ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+              [
+                sessionDay.id,
+                sessionDay.session_id,
+                sessionDay.day_number,
+                sessionDay.exercise_group_id,
+                sessionDay.created_at,
+                sessionDay.sync_version,
+                new Date().toISOString(),
+              ]
+            );
+          }
+        });
+      }
+
+      // Merge session exercises into local DB
+      if (updates.sessionExercises) {
+        updates.sessionExercises.forEach((sessionExercise) => {
+          const existing = query(
+            'SELECT sync_version FROM session_exercises WHERE id = ?',
+            [sessionExercise.id]
+          )[0];
+
+          if (!existing || existing.sync_version < sessionExercise.sync_version) {
+            run(
+              `INSERT OR REPLACE INTO session_exercises (
+                id, session_id, day_number, muscle_group, exercise_id, selection_order,
+                created_at, sync_version, last_synced_at
+              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+              [
+                sessionExercise.id,
+                sessionExercise.session_id,
+                sessionExercise.day_number,
+                sessionExercise.muscle_group,
+                sessionExercise.exercise_id,
+                sessionExercise.selection_order,
+                sessionExercise.created_at,
+                sessionExercise.sync_version,
+                new Date().toISOString(),
+              ]
+            );
+          }
+        });
+      }
 
       // Merge sets into local DB
       updates.sets.forEach((set) => {

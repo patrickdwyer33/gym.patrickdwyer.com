@@ -445,6 +445,121 @@ button:disabled {
 }
 
 /* ============================================
+   Day Selector
+   ============================================ */
+.day-selector {
+  background: var(--theme-white);
+  border: 2px solid var(--theme-brown-light);
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.day-selector h3 {
+  margin: 0 0 1rem 0;
+  font-size: 1.125rem;
+  color: var(--theme-brown-darkest);
+  text-align: center;
+}
+
+.day-checkboxes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 0.75rem;
+}
+
+.day-checkbox {
+  display: flex;
+  align-items: flex-start;
+  padding: 0.75rem;
+  border: 2px solid var(--theme-brown-light);
+  border-radius: 4px;
+  background: var(--theme-brown-lightest);
+  cursor: pointer;
+  transition: all 0.2s;
+  min-height: 44px;
+}
+
+.day-checkbox:hover {
+  border-color: var(--theme-brown);
+  background: var(--theme-white);
+}
+
+.day-checkbox.active {
+  background: var(--theme-blue-lightest);
+  border-color: var(--theme-blue);
+}
+
+.day-checkbox.current {
+  border-color: var(--theme-brown-dark);
+  border-width: 3px;
+}
+
+.day-checkbox.active.current {
+  border-color: var(--theme-blue-dark);
+}
+
+.day-checkbox input[type="checkbox"] {
+  margin-right: 0.75rem;
+  min-width: 18px;
+  min-height: 18px;
+  cursor: pointer;
+  flex-shrink: 0;
+  margin-top: 0.125rem;
+}
+
+.day-label {
+  font-weight: 600;
+  color: var(--theme-brown-darkest);
+  margin-bottom: 0.25rem;
+}
+
+.day-muscles {
+  font-size: 0.875rem;
+  color: var(--theme-brown-dark);
+}
+
+.no-active-days {
+  text-align: center;
+  padding: 2rem;
+  background: var(--theme-blue-lightest);
+  border-radius: 8px;
+  margin: 2rem 0;
+}
+
+.no-active-days p {
+  margin: 0;
+  color: var(--theme-brown-dark);
+}
+
+/* ============================================
+   Day Section
+   ============================================ */
+.day-section {
+  background: var(--theme-white);
+  border: 2px solid var(--theme-blue-light);
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.day-section h2 {
+  margin: 0 0 1rem 0;
+  font-size: 1.5rem;
+  color: var(--theme-brown-darkest);
+  text-align: center;
+  padding-bottom: 0.75rem;
+  border-bottom: 2px solid var(--theme-brown-light);
+}
+
+.day-exercises-confirmed {
+  padding: 1.5rem;
+  background: #e8f5e9;
+  border-radius: 8px;
+  margin-top: 1rem;
+}
+
+/* ============================================
    Rest Timer
    ============================================ */
 .rest-timer {
@@ -730,6 +845,19 @@ button:disabled {
 @media (max-width: 640px) {
   .exercise-selector {
     flex-direction: column;
+  }
+
+  .day-checkboxes {
+    grid-template-columns: 1fr;
+  }
+
+  .day-checkbox {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .day-checkbox input[type="checkbox"] {
+    margin-bottom: 0.5rem;
   }
 
   .stepper {

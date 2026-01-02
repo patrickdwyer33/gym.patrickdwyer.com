@@ -3,7 +3,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { query, run, saveDBToIndexedDB } from '../lib/db/localDB';
+import { query } from '../lib/db/localDB';
 import { useSync } from '../contexts/SyncContext';
 
 /**
@@ -22,14 +22,31 @@ export function useTodayWorkout(date = null) {
       const sessionDate = date || new Date().toISOString().split('T')[0];
 
       const session = query(
-        `SELECT ws.*, eg.name as group_name, eg.exercise1_id, eg.exercise2_id
-         FROM workout_sessions ws
-         LEFT JOIN exercise_groups eg ON ws.exercise_group_id = eg.id
-         WHERE ws.session_date = ?`,
+        `SELECT * FROM workout_sessions WHERE session_date = ?`,
         [sessionDate]
       )[0];
 
       if (session) {
+        // Get active days for this session
+        const activeDays = query(
+          `SELECT sd.*, eg.name, eg.muscle_group1, eg.muscle_group2
+           FROM session_days sd
+           JOIN exercise_groups eg ON sd.exercise_group_id = eg.id
+           WHERE sd.session_id = ?
+           ORDER BY sd.day_number`,
+          [session.id]
+        );
+
+        // Get selected exercises
+        const selectedExercises = query(
+          `SELECT se.*, e.name, e.muscle_group, e.type
+           FROM session_exercises se
+           JOIN exercises e ON se.exercise_id = e.id
+           WHERE se.session_id = ?
+           ORDER BY se.day_number, se.selection_order`,
+          [session.id]
+        );
+
         // Get sets for this session
         const sets = query(
           `SELECT ws.*, e.name as exercise_name
@@ -40,7 +57,7 @@ export function useTodayWorkout(date = null) {
           [session.id]
         );
 
-        setWorkout({ ...session, sets });
+        setWorkout({ ...session, activeDays, selectedExercises, sets });
       } else {
         setWorkout(null);
       }
@@ -73,16 +90,33 @@ export function useWorkoutHistory(limit = 20) {
     try {
       setLoading(true);
       const sessions = query(
-        `SELECT ws.*, eg.name as group_name
+        `SELECT ws.*
          FROM workout_sessions ws
-         LEFT JOIN exercise_groups eg ON ws.exercise_group_id = eg.id
          WHERE ws.status = 'completed'
          ORDER BY ws.session_date DESC
          LIMIT ?`,
         [limit]
       );
 
-      setHistory(sessions);
+      // For each session, get the active days info
+      const sessionsWithDetails = sessions.map(session => {
+        const activeDays = query(
+          `SELECT sd.day_number, eg.name as group_name
+           FROM session_days sd
+           JOIN exercise_groups eg ON sd.exercise_group_id = eg.id
+           WHERE sd.session_id = ?
+           ORDER BY sd.day_number`,
+          [session.id]
+        );
+
+        return {
+          ...session,
+          activeDays,
+          group_name: activeDays.map(d => `Day ${d.day_number}`).join(', ')
+        };
+      });
+
+      setHistory(sessionsWithDetails);
     } catch (error) {
       console.error('Failed to load history:', error);
       setHistory([]);
@@ -99,215 +133,142 @@ export function useWorkoutHistory(limit = 20) {
 }
 
 /**
- * Create or update workout session
+ * Create or update workout session - uses API for multi-day support
  */
 export function useWorkoutMutations() {
-  const { pushUpdates } = useSync();
+  const { pullUpdates } = useSync();
 
   const createSession = useCallback(
-    async (date, dayNumber, exerciseGroupId) => {
+    async (date) => {
       try {
-        const now = new Date().toISOString();
-        run(
-          `INSERT INTO workout_sessions (
-          session_date, day_number, exercise_group_id, status,
-          created_at, updated_at, sync_version
-        ) VALUES (?, ?, ?, 'in_progress', ?, ?, 0)`,
-          [date, dayNumber, exerciseGroupId, now, now]
-        );
+        const { workoutAPI } = await import('../lib/api/client');
+        const result = await workoutAPI.createSession(date);
 
-        await saveDBToIndexedDB();
-        await pushUpdates(); // Sync to server
+        // Pull updates to sync the server changes to local DB
+        await pullUpdates();
 
-        // Get the created session
-        return query(
-          'SELECT * FROM workout_sessions WHERE session_date = ?',
-          [date]
-        )[0];
+        return result.session;
       } catch (error) {
         console.error('Failed to create session:', error);
         throw error;
       }
     },
-    [pushUpdates]
+    [pullUpdates]
   );
 
-  const updateSession = useCallback(
-    async (id, updates) => {
+  const toggleDay = useCallback(
+    async (sessionId, dayNumber, exerciseGroupId) => {
       try {
-        const now = new Date().toISOString();
-        const fields = Object.keys(updates);
-        const values = Object.values(updates);
+        const { workoutAPI } = await import('../lib/api/client');
+        const result = await workoutAPI.toggleDay(sessionId, dayNumber, exerciseGroupId);
 
-        const setClause = fields.map((f) => `${f} = ?`).join(', ');
-        run(
-          `UPDATE workout_sessions
-           SET ${setClause}, updated_at = ?, sync_version = sync_version + 1
-           WHERE id = ?`,
-          [...values, now, id]
-        );
+        // Pull updates to sync the server changes to local DB
+        await pullUpdates();
 
-        await saveDBToIndexedDB();
-        await pushUpdates(); // Sync to server
+        return result;
       } catch (error) {
-        console.error('Failed to update session:', error);
+        console.error('Failed to toggle day:', error);
         throw error;
       }
     },
-    [pushUpdates]
-  );
-
-  const createSet = useCallback(
-    async (setData) => {
-      try {
-        const now = new Date().toISOString();
-        run(
-          `INSERT INTO workout_sets (
-          session_id, exercise_id, set_number, reps, weight,
-          duration_seconds, notes, completed, created_at, updated_at, sync_version
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
-          [
-            setData.sessionId,
-            setData.exerciseId,
-            setData.setNumber,
-            setData.reps || null,
-            setData.weight || null,
-            setData.durationSeconds || null,
-            setData.notes || null,
-            setData.completed || 0,
-            now,
-            now,
-          ]
-        );
-
-        await saveDBToIndexedDB();
-        await pushUpdates(); // Sync to server
-
-        // Get the created set
-        return query(
-          'SELECT * FROM workout_sets WHERE session_id = ? AND exercise_id = ? AND set_number = ?',
-          [setData.sessionId, setData.exerciseId, setData.setNumber]
-        )[0];
-      } catch (error) {
-        console.error('Failed to create set:', error);
-        throw error;
-      }
-    },
-    [pushUpdates]
-  );
-
-  const updateSet = useCallback(
-    async (id, updates) => {
-      try {
-        const now = new Date().toISOString();
-        const fields = Object.keys(updates);
-        const values = Object.values(updates);
-
-        const setClause = fields.map((f) => `${f} = ?`).join(', ');
-        run(
-          `UPDATE workout_sets
-           SET ${setClause}, updated_at = ?, sync_version = sync_version + 1
-           WHERE id = ?`,
-          [...values, now, id]
-        );
-
-        await saveDBToIndexedDB();
-        await pushUpdates(); // Sync to server
-      } catch (error) {
-        console.error('Failed to update set:', error);
-        throw error;
-      }
-    },
-    [pushUpdates]
-  );
-
-  const deleteSet = useCallback(
-    async (id) => {
-      try {
-        run('DELETE FROM workout_sets WHERE id = ?', [id]);
-
-        await saveDBToIndexedDB();
-        await pushUpdates(); // Sync to server
-      } catch (error) {
-        console.error('Failed to delete set:', error);
-        throw error;
-      }
-    },
-    [pushUpdates]
+    [pullUpdates]
   );
 
   const selectExercises = useCallback(
-    async (sessionId, exercise1Id, exercise2Id) => {
+    async (sessionId, dayNumber, exercise1Id, exercise2Id) => {
       try {
-        const now = new Date().toISOString();
+        const { workoutAPI } = await import('../lib/api/client');
+        const result = await workoutAPI.selectExercises(sessionId, dayNumber, exercise1Id, exercise2Id);
 
-        // Get session to get muscle groups for validation
-        const session = query(
-          `SELECT ws.*, eg.muscle_group1, eg.muscle_group2
-           FROM workout_sessions ws
-           JOIN exercise_groups eg ON ws.exercise_group_id = eg.id
-           WHERE ws.id = ?`,
-          [sessionId]
-        )[0];
+        // Pull updates to sync the server changes to local DB
+        await pullUpdates();
 
-        if (!session) {
-          throw new Error('Session not found');
-        }
-
-        // Get exercises to get muscle groups
-        const exercise1 = query('SELECT * FROM exercises WHERE id = ?', [exercise1Id])[0];
-        const exercise2 = query('SELECT * FROM exercises WHERE id = ?', [exercise2Id])[0];
-
-        if (!exercise1 || !exercise2) {
-          throw new Error('One or both exercises not found');
-        }
-
-        // Delete existing selections
-        run('DELETE FROM session_exercises WHERE session_id = ?', [sessionId]);
-
-        // Insert new selections
-        run(
-          `INSERT INTO session_exercises (
-            session_id, muscle_group, exercise_id, selection_order,
-            created_at, sync_version
-          ) VALUES (?, ?, ?, 1, ?, 0)`,
-          [sessionId, exercise1.muscle_group, exercise1Id, now]
-        );
-
-        run(
-          `INSERT INTO session_exercises (
-            session_id, muscle_group, exercise_id, selection_order,
-            created_at, sync_version
-          ) VALUES (?, ?, ?, 2, ?, 0)`,
-          [sessionId, exercise2.muscle_group, exercise2Id, now]
-        );
-
-        await saveDBToIndexedDB();
-        await pushUpdates(); // Sync to server
-
-        // Return the selections
-        return query(
-          `SELECT se.*, e.name, e.muscle_group, e.type
-           FROM session_exercises se
-           JOIN exercises e ON se.exercise_id = e.id
-           WHERE se.session_id = ?
-           ORDER BY se.selection_order`,
-          [sessionId]
-        );
+        return result.selectedExercises;
       } catch (error) {
         console.error('Failed to select exercises:', error);
         throw error;
       }
     },
-    [pushUpdates]
+    [pullUpdates]
+  );
+
+  const updateSession = useCallback(
+    async (id, updates) => {
+      try {
+        const { workoutAPI } = await import('../lib/api/client');
+        const result = await workoutAPI.updateSession(id, updates);
+
+        // Pull updates to sync the server changes to local DB
+        await pullUpdates();
+
+        return result.session;
+      } catch (error) {
+        console.error('Failed to update session:', error);
+        throw error;
+      }
+    },
+    [pullUpdates]
+  );
+
+  const createSet = useCallback(
+    async (setData) => {
+      try {
+        const { workoutAPI } = await import('../lib/api/client');
+        const result = await workoutAPI.createSet(setData);
+
+        // Pull updates to sync the server changes to local DB
+        await pullUpdates();
+
+        return result.set;
+      } catch (error) {
+        console.error('Failed to create set:', error);
+        throw error;
+      }
+    },
+    [pullUpdates]
+  );
+
+  const updateSet = useCallback(
+    async (id, updates) => {
+      try {
+        const { workoutAPI } = await import('../lib/api/client');
+        const result = await workoutAPI.updateSet(id, updates);
+
+        // Pull updates to sync the server changes to local DB
+        await pullUpdates();
+
+        return result.set;
+      } catch (error) {
+        console.error('Failed to update set:', error);
+        throw error;
+      }
+    },
+    [pullUpdates]
+  );
+
+  const deleteSet = useCallback(
+    async (id) => {
+      try {
+        const { workoutAPI } = await import('../lib/api/client');
+        await workoutAPI.deleteSet(id);
+
+        // Pull updates to sync the server changes to local DB
+        await pullUpdates();
+      } catch (error) {
+        console.error('Failed to delete set:', error);
+        throw error;
+      }
+    },
+    [pullUpdates]
   );
 
   return {
     createSession,
+    toggleDay,
+    selectExercises,
     updateSession,
     createSet,
     updateSet,
     deleteSet,
-    selectExercises,
   };
 }

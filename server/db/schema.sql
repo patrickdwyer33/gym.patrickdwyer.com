@@ -21,10 +21,26 @@ CREATE TABLE IF NOT EXISTS schedule (
     FOREIGN KEY (workout_id) REFERENCES exercise_groups(id)
 );
 
+-- Junction table to track which days/muscle groups are active in each session
+CREATE TABLE IF NOT EXISTS session_days (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id INTEGER NOT NULL,
+    day_number INTEGER NOT NULL CHECK(day_number BETWEEN 1 AND 10),
+    exercise_group_id INTEGER NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    -- Sync tracking
+    sync_version INTEGER DEFAULT 0,
+    last_synced_at TIMESTAMP,
+    FOREIGN KEY (session_id) REFERENCES workout_sessions(id) ON DELETE CASCADE,
+    FOREIGN KEY (exercise_group_id) REFERENCES exercise_groups(id),
+    UNIQUE(session_id, day_number)
+);
+
 -- Junction table to track which exercises were selected for each session
 CREATE TABLE IF NOT EXISTS session_exercises (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     session_id INTEGER NOT NULL,
+    day_number INTEGER NOT NULL CHECK(day_number BETWEEN 1 AND 10),
     muscle_group TEXT NOT NULL,
     exercise_id INTEGER NOT NULL,
     selection_order INTEGER NOT NULL CHECK(selection_order IN (1, 2)),
@@ -34,15 +50,13 @@ CREATE TABLE IF NOT EXISTS session_exercises (
     last_synced_at TIMESTAMP,
     FOREIGN KEY (session_id) REFERENCES workout_sessions(id) ON DELETE CASCADE,
     FOREIGN KEY (exercise_id) REFERENCES exercises(id),
-    UNIQUE(session_id, selection_order)
+    UNIQUE(session_id, day_number, selection_order)
 );
 
 -- User data (dynamic, synced)
 CREATE TABLE IF NOT EXISTS workout_sessions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     session_date DATE NOT NULL,
-    day_number INTEGER NOT NULL CHECK(day_number BETWEEN 1 AND 10),
-    exercise_group_id INTEGER NOT NULL,
     status TEXT NOT NULL DEFAULT 'in_progress' CHECK(status IN ('not_started', 'in_progress', 'completed')),
     notes TEXT,
     started_at TIMESTAMP,
@@ -52,7 +66,6 @@ CREATE TABLE IF NOT EXISTS workout_sessions (
     -- Sync tracking
     sync_version INTEGER DEFAULT 0,
     last_synced_at TIMESTAMP,
-    FOREIGN KEY (exercise_group_id) REFERENCES exercise_groups(id),
     UNIQUE(session_date)
 );
 
@@ -98,8 +111,9 @@ CREATE TABLE IF NOT EXISTS app_config (
 
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_workout_sessions_date ON workout_sessions(session_date);
-CREATE INDEX IF NOT EXISTS idx_workout_sessions_day ON workout_sessions(day_number);
 CREATE INDEX IF NOT EXISTS idx_workout_sets_session ON workout_sets(session_id);
 CREATE INDEX IF NOT EXISTS idx_workout_sets_updated ON workout_sets(updated_at);
 CREATE INDEX IF NOT EXISTS idx_workout_sessions_updated ON workout_sessions(updated_at);
 CREATE INDEX IF NOT EXISTS idx_session_exercises_session ON session_exercises(session_id);
+CREATE INDEX IF NOT EXISTS idx_session_days_session ON session_days(session_id);
+CREATE INDEX IF NOT EXISTS idx_session_exercises_day ON session_exercises(session_id, day_number);

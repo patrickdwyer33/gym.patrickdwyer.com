@@ -10,7 +10,7 @@ const router = express.Router();
  */
 router.post('/push', authenticate, async (req, res) => {
   try {
-    const { sessions = [], sets = [] } = req.body;
+    const { sessions = [], sets = [], sessionDays = [], sessionExercises = [] } = req.body;
 
     let synced = 0;
     let failed = 0;
@@ -21,15 +21,12 @@ router.post('/push', authenticate, async (req, res) => {
       try {
         run(
           `INSERT OR REPLACE INTO workout_sessions (
-            id, session_date, day_number, exercise_group_id, status,
-            notes, started_at, completed_at, created_at, updated_at,
-            sync_version, last_synced_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            id, session_date, status, notes, started_at, completed_at,
+            created_at, updated_at, sync_version, last_synced_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             session.id,
             session.session_date,
-            session.day_number,
-            session.exercise_group_id,
             session.status,
             session.notes,
             session.started_at,
@@ -45,6 +42,60 @@ router.post('/push', authenticate, async (req, res) => {
         console.error('Sync session error:', error);
         failed++;
         conflicts.push({ type: 'session', id: session.id, error: error.message });
+      }
+    }
+
+    // Sync session days
+    for (const sessionDay of sessionDays) {
+      try {
+        run(
+          `INSERT OR REPLACE INTO session_days (
+            id, session_id, day_number, exercise_group_id,
+            created_at, sync_version, last_synced_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          [
+            sessionDay.id,
+            sessionDay.session_id,
+            sessionDay.day_number,
+            sessionDay.exercise_group_id,
+            sessionDay.created_at,
+            (sessionDay.sync_version || 0) + 1,
+            new Date().toISOString(),
+          ]
+        );
+        synced++;
+      } catch (error) {
+        console.error('Sync session day error:', error);
+        failed++;
+        conflicts.push({ type: 'session_day', id: sessionDay.id, error: error.message });
+      }
+    }
+
+    // Sync session exercises
+    for (const sessionExercise of sessionExercises) {
+      try {
+        run(
+          `INSERT OR REPLACE INTO session_exercises (
+            id, session_id, day_number, muscle_group, exercise_id, selection_order,
+            created_at, sync_version, last_synced_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            sessionExercise.id,
+            sessionExercise.session_id,
+            sessionExercise.day_number,
+            sessionExercise.muscle_group,
+            sessionExercise.exercise_id,
+            sessionExercise.selection_order,
+            sessionExercise.created_at,
+            (sessionExercise.sync_version || 0) + 1,
+            new Date().toISOString(),
+          ]
+        );
+        synced++;
+      } catch (error) {
+        console.error('Sync session exercise error:', error);
+        failed++;
+        conflicts.push({ type: 'session_exercise', id: sessionExercise.id, error: error.message });
       }
     }
 
@@ -110,6 +161,20 @@ router.get('/pull', async (req, res) => {
       ORDER BY updated_at ASC
     `, [since]);
 
+    // Get session days (no updated_at, use created_at)
+    const sessionDays = getAll(`
+      SELECT * FROM session_days
+      WHERE created_at > ?
+      ORDER BY created_at ASC
+    `, [since]);
+
+    // Get session exercises (no updated_at, use created_at)
+    const sessionExercises = getAll(`
+      SELECT * FROM session_exercises
+      WHERE created_at > ?
+      ORDER BY created_at ASC
+    `, [since]);
+
     // Get updated sets since timestamp
     const sets = getAll(`
       SELECT * FROM workout_sets
@@ -119,6 +184,8 @@ router.get('/pull', async (req, res) => {
 
     res.json({
       sessions,
+      sessionDays,
+      sessionExercises,
       sets,
       timestamp: new Date().toISOString()
     });

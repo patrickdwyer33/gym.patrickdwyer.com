@@ -43,55 +43,46 @@ export function useWorkout(date = null) {
       )[0];
       const cycleStartDate = configRow?.value || dateStr;
 
-      // Calculate day number
-      const dayNumber = calculateDayNumber(dateStr, cycleStartDate);
+      // Calculate current day number
+      const currentDayNumber = calculateDayNumber(dateStr, cycleStartDate);
 
-      console.log('Workout query debug:', { dateStr, cycleStartDate, dayNumber });
-
-      // Get exercise group for this day
-      const scheduleRow = query(
-        `SELECT eg.*
+      // Get ALL schedule days with their exercise groups
+      const scheduleDays = query(
+        `SELECT s.day_number, s.workout_id, eg.id as exercise_group_id,
+                eg.name, eg.muscle_group1, eg.muscle_group2
          FROM schedule s
          JOIN exercise_groups eg ON s.workout_id = eg.id
-         WHERE s.day_number = ?`,
-        [dayNumber]
-      )[0];
-
-      if (!scheduleRow) {
-        console.error('No workout found for day', dayNumber);
-        // Debug: check what's in the schedule table
-        const allSchedule = query('SELECT * FROM schedule');
-        console.log('Schedule table contents:', allSchedule);
-        setError('No workout found for this day');
-        setWorkout(null);
-        return;
-      }
-
-      console.log('Found workout for day', dayNumber, scheduleRow);
-
-      // Get ALL exercises for muscle_group1
-      const muscleGroup1Exercises = query(
-        `SELECT id, name, muscle_group, type
-         FROM exercises
-         WHERE muscle_group = ?
-         ORDER BY name`,
-        [scheduleRow.muscle_group1]
+         ORDER BY s.day_number`
       );
 
-      // Get ALL exercises for muscle_group2
-      const muscleGroup2Exercises = query(
-        `SELECT id, name, muscle_group, type
-         FROM exercises
-         WHERE muscle_group = ?
-         ORDER BY name`,
-        [scheduleRow.muscle_group2]
-      );
+      // Get all exercises grouped by muscle group
+      const allExercises = query('SELECT * FROM exercises ORDER BY muscle_group, name');
+      const exercisesByMuscleGroup = allExercises.reduce((acc, ex) => {
+        if (!acc[ex.muscle_group]) {
+          acc[ex.muscle_group] = [];
+        }
+        acc[ex.muscle_group].push(ex);
+        return acc;
+      }, {});
 
       // Get session for this date if it exists
       const session = query(
         'SELECT * FROM workout_sessions WHERE session_date = ?',
         [dateStr]
       )[0] || null;
+
+      // Get active days for this session
+      let activeDays = [];
+      if (session) {
+        activeDays = query(
+          `SELECT sd.*, eg.name, eg.muscle_group1, eg.muscle_group2
+           FROM session_days sd
+           JOIN exercise_groups eg ON sd.exercise_group_id = eg.id
+           WHERE sd.session_id = ?
+           ORDER BY sd.day_number`,
+          [session.id]
+        );
+      }
 
       // Get selected exercises if session exists
       let selectedExercises = [];
@@ -101,7 +92,7 @@ export function useWorkout(date = null) {
            FROM session_exercises se
            JOIN exercises e ON se.exercise_id = e.id
            WHERE se.session_id = ?
-           ORDER BY se.selection_order`,
+           ORDER BY se.day_number, se.selection_order`,
           [session.id]
         );
       }
@@ -117,28 +108,14 @@ export function useWorkout(date = null) {
         );
       }
 
-      // Format response to match API structure
-      const exerciseGroup = {
-        id: scheduleRow.id,
-        name: scheduleRow.name,
-        muscleGroups: [
-          {
-            name: scheduleRow.muscle_group1,
-            exercises: muscleGroup1Exercises,
-          },
-          {
-            name: scheduleRow.muscle_group2,
-            exercises: muscleGroup2Exercises,
-          },
-        ],
-      };
-
       setWorkout({
         date: dateStr,
-        dayNumber,
-        exerciseGroup,
-        selectedExercises,
+        currentDayNumber,
+        scheduleDays,
+        exercisesByMuscleGroup,
         session,
+        activeDays,
+        selectedExercises,
         sets,
       });
     } catch (err) {

@@ -7,7 +7,7 @@ const router = express.Router();
 
 /**
  * GET /api/workouts/today
- * Get today's workout (exercise group, exercises, and session if exists)
+ * Get today's workout data (all schedule days, session, selected exercises, sets)
  */
 router.get('/today', async (req, res) => {
   try {
@@ -17,42 +17,44 @@ router.get('/today', async (req, res) => {
     const configRow = getOne('SELECT value FROM app_config WHERE key = ?', ['cycle_start_date']);
     const cycleStartDate = configRow?.value || date;
 
-    // Calculate day number
-    const dayNumber = calculateDayNumber(date, cycleStartDate);
+    // Calculate current day number
+    const currentDayNumber = calculateDayNumber(date, cycleStartDate);
 
-    // Get exercise group for this day
-    const scheduleRow = getOne(`
-      SELECT eg.*
+    // Get ALL schedule days with their exercise groups
+    const scheduleDays = getAll(`
+      SELECT s.day_number, s.workout_id, eg.id as exercise_group_id, eg.name, eg.muscle_group1, eg.muscle_group2
       FROM schedule s
       JOIN exercise_groups eg ON s.workout_id = eg.id
-      WHERE s.day_number = ?
-    `, [dayNumber]);
+      ORDER BY s.day_number
+    `);
 
-    if (!scheduleRow) {
-      return res.status(404).json({ error: 'No workout found for this day' });
-    }
-
-    // Get ALL exercises for muscle_group1
-    const muscleGroup1Exercises = getAll(`
-      SELECT id, name, muscle_group, type
-      FROM exercises
-      WHERE muscle_group = ?
-      ORDER BY name
-    `, [scheduleRow.muscle_group1]);
-
-    // Get ALL exercises for muscle_group2
-    const muscleGroup2Exercises = getAll(`
-      SELECT id, name, muscle_group, type
-      FROM exercises
-      WHERE muscle_group = ?
-      ORDER BY name
-    `, [scheduleRow.muscle_group2]);
+    // Get all exercises grouped by muscle group
+    const allExercises = getAll('SELECT * FROM exercises ORDER BY muscle_group, name');
+    const exercisesByMuscleGroup = allExercises.reduce((acc, ex) => {
+      if (!acc[ex.muscle_group]) {
+        acc[ex.muscle_group] = [];
+      }
+      acc[ex.muscle_group].push(ex);
+      return acc;
+    }, {});
 
     // Get session for this date if it exists
     const session = getOne(`
       SELECT * FROM workout_sessions
       WHERE session_date = ?
     `, [date]);
+
+    // Get active days for this session
+    let activeDays = [];
+    if (session) {
+      activeDays = getAll(`
+        SELECT sd.*, eg.name, eg.muscle_group1, eg.muscle_group2
+        FROM session_days sd
+        JOIN exercise_groups eg ON sd.exercise_group_id = eg.id
+        WHERE sd.session_id = ?
+        ORDER BY sd.day_number
+      `, [session.id]);
+    }
 
     // Get selected exercises if session exists
     let selectedExercises = [];
@@ -62,7 +64,7 @@ router.get('/today', async (req, res) => {
         FROM session_exercises se
         JOIN exercises e ON se.exercise_id = e.id
         WHERE se.session_id = ?
-        ORDER BY se.selection_order
+        ORDER BY se.day_number, se.selection_order
       `, [session.id]);
     }
 
@@ -76,28 +78,14 @@ router.get('/today', async (req, res) => {
       `, [session.id]);
     }
 
-    // Format response
-    const exerciseGroup = {
-      id: scheduleRow.id,
-      name: scheduleRow.name,
-      muscleGroups: [
-        {
-          name: scheduleRow.muscle_group1,
-          exercises: muscleGroup1Exercises
-        },
-        {
-          name: scheduleRow.muscle_group2,
-          exercises: muscleGroup2Exercises
-        }
-      ]
-    };
-
     res.json({
       date,
-      dayNumber,
-      exerciseGroup,
-      selectedExercises,
+      currentDayNumber,
+      scheduleDays,
+      exercisesByMuscleGroup,
       session,
+      activeDays,
+      selectedExercises,
       sets
     });
   } catch (error) {
@@ -178,16 +166,16 @@ router.get('/session/:id', async (req, res) => {
  */
 router.post('/session', authenticate, async (req, res) => {
   try {
-    const { date, dayNumber, exerciseGroupId } = req.body;
+    const { date } = req.body;
 
-    if (!date || !dayNumber || !exerciseGroupId) {
-      return res.status(400).json({ error: 'Date, day number, and exercise group ID required' });
+    if (!date) {
+      return res.status(400).json({ error: 'Date required' });
     }
 
     const result = run(`
-      INSERT INTO workout_sessions (session_date, day_number, exercise_group_id, status, started_at, updated_at)
-      VALUES (?, ?, ?, 'in_progress', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-    `, [date, dayNumber, exerciseGroupId]);
+      INSERT INTO workout_sessions (session_date, status, started_at, updated_at)
+      VALUES (?, 'in_progress', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+    `, [date]);
 
     const session = getOne('SELECT * FROM workout_sessions WHERE id = ?', [result.lastInsertRowid]);
 
@@ -202,28 +190,76 @@ router.post('/session', authenticate, async (req, res) => {
 });
 
 /**
+ * POST /api/workouts/session/:id/toggle-day
+ * Toggle a day on/off for a session (admin only)
+ */
+router.post('/session/:id/toggle-day', authenticate, async (req, res) => {
+  try {
+    const sessionId = req.params.id;
+    const { dayNumber, exerciseGroupId } = req.body;
+
+    if (!dayNumber || !exerciseGroupId) {
+      return res.status(400).json({ error: 'Day number and exercise group ID required' });
+    }
+
+    // Check if day is already active
+    const existing = getOne(`
+      SELECT * FROM session_days
+      WHERE session_id = ? AND day_number = ?
+    `, [sessionId, dayNumber]);
+
+    if (existing) {
+      // Remove the day
+      run('DELETE FROM session_days WHERE session_id = ? AND day_number = ?', [sessionId, dayNumber]);
+      // Also remove selected exercises for this day
+      run('DELETE FROM session_exercises WHERE session_id = ? AND day_number = ?', [sessionId, dayNumber]);
+    } else {
+      // Add the day
+      run(`
+        INSERT INTO session_days (session_id, day_number, exercise_group_id, updated_at)
+        VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+      `, [sessionId, dayNumber, exerciseGroupId]);
+    }
+
+    // Get updated active days
+    const activeDays = getAll(`
+      SELECT sd.*, eg.name, eg.muscle_group1, eg.muscle_group2
+      FROM session_days sd
+      JOIN exercise_groups eg ON sd.exercise_group_id = eg.id
+      WHERE sd.session_id = ?
+      ORDER BY sd.day_number
+    `, [sessionId]);
+
+    res.json({ activeDays });
+  } catch (error) {
+    console.error('Toggle day error:', error);
+    res.status(500).json({ error: 'Failed to toggle day' });
+  }
+});
+
+/**
  * POST /api/workouts/session/:id/select-exercises
- * Select exercises for a workout session (admin only)
+ * Select exercises for a specific day in a workout session (admin only)
  */
 router.post('/session/:id/select-exercises', authenticate, async (req, res) => {
   try {
     const sessionId = req.params.id;
-    const { exercise1Id, exercise2Id } = req.body;
+    const { dayNumber, exercise1Id, exercise2Id } = req.body;
 
-    if (!exercise1Id || !exercise2Id) {
-      return res.status(400).json({ error: 'Both exercise IDs required' });
+    if (!dayNumber || !exercise1Id || !exercise2Id) {
+      return res.status(400).json({ error: 'Day number and both exercise IDs required' });
     }
 
-    // Get session to verify it exists and get exercise group
-    const session = getOne(`
-      SELECT ws.*, eg.muscle_group1, eg.muscle_group2
-      FROM workout_sessions ws
-      JOIN exercise_groups eg ON ws.exercise_group_id = eg.id
-      WHERE ws.id = ?
-    `, [sessionId]);
+    // Verify the day is active for this session
+    const sessionDay = getOne(`
+      SELECT sd.*, eg.muscle_group1, eg.muscle_group2
+      FROM session_days sd
+      JOIN exercise_groups eg ON sd.exercise_group_id = eg.id
+      WHERE sd.session_id = ? AND sd.day_number = ?
+    `, [sessionId, dayNumber]);
 
-    if (!session) {
-      return res.status(404).json({ error: 'Session not found' });
+    if (!sessionDay) {
+      return res.status(400).json({ error: 'Day not active for this session' });
     }
 
     // Get the exercises to validate they match the muscle groups
@@ -234,39 +270,39 @@ router.post('/session/:id/select-exercises', authenticate, async (req, res) => {
       return res.status(404).json({ error: 'One or both exercises not found' });
     }
 
-    // Validate exercises match the session's muscle groups
-    if (exercise1.muscle_group !== session.muscle_group1) {
+    // Validate exercises match the day's muscle groups
+    if (exercise1.muscle_group !== sessionDay.muscle_group1) {
       return res.status(400).json({
-        error: `Exercise 1 must be from muscle group: ${session.muscle_group1}`
+        error: `Exercise 1 must be from muscle group: ${sessionDay.muscle_group1}`
       });
     }
-    if (exercise2.muscle_group !== session.muscle_group2) {
+    if (exercise2.muscle_group !== sessionDay.muscle_group2) {
       return res.status(400).json({
-        error: `Exercise 2 must be from muscle group: ${session.muscle_group2}`
+        error: `Exercise 2 must be from muscle group: ${sessionDay.muscle_group2}`
       });
     }
 
-    // Delete existing selections
-    run('DELETE FROM session_exercises WHERE session_id = ?', [sessionId]);
+    // Delete existing selections for this day
+    run('DELETE FROM session_exercises WHERE session_id = ? AND day_number = ?', [sessionId, dayNumber]);
 
     // Insert new selections
     run(`
-      INSERT INTO session_exercises (session_id, muscle_group, exercise_id, selection_order)
-      VALUES (?, ?, ?, 1)
-    `, [sessionId, exercise1.muscle_group, exercise1Id]);
+      INSERT INTO session_exercises (session_id, day_number, muscle_group, exercise_id, selection_order, updated_at)
+      VALUES (?, ?, ?, ?, 1, CURRENT_TIMESTAMP)
+    `, [sessionId, dayNumber, exercise1.muscle_group, exercise1Id]);
 
     run(`
-      INSERT INTO session_exercises (session_id, muscle_group, exercise_id, selection_order)
-      VALUES (?, ?, ?, 2)
-    `, [sessionId, exercise2.muscle_group, exercise2Id]);
+      INSERT INTO session_exercises (session_id, day_number, muscle_group, exercise_id, selection_order, updated_at)
+      VALUES (?, ?, ?, ?, 2, CURRENT_TIMESTAMP)
+    `, [sessionId, dayNumber, exercise2.muscle_group, exercise2Id]);
 
-    // Get the selections to return
+    // Get all selections for this session
     const selectedExercises = getAll(`
       SELECT se.*, e.name, e.muscle_group, e.type
       FROM session_exercises se
       JOIN exercises e ON se.exercise_id = e.id
       WHERE se.session_id = ?
-      ORDER BY se.selection_order
+      ORDER BY se.day_number, se.selection_order
     `, [sessionId]);
 
     res.json({ selectedExercises });

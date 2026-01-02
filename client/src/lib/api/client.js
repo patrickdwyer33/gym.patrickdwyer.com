@@ -97,10 +97,24 @@ export const workoutAPI = {
     return fetchAPI(`/workouts/session/${id}`);
   },
 
-  createSession: async (date, dayNumber, exerciseGroupId) => {
+  createSession: async (date) => {
     return fetchAPI('/workouts/session', {
       method: 'POST',
-      body: JSON.stringify({ date, dayNumber, exerciseGroupId }),
+      body: JSON.stringify({ date }),
+    });
+  },
+
+  toggleDay: async (sessionId, dayNumber, exerciseGroupId) => {
+    return fetchAPI(`/workouts/session/${sessionId}/toggle-day`, {
+      method: 'POST',
+      body: JSON.stringify({ dayNumber, exerciseGroupId }),
+    });
+  },
+
+  selectExercises: async (sessionId, dayNumber, exercise1Id, exercise2Id) => {
+    return fetchAPI(`/workouts/session/${sessionId}/select-exercises`, {
+      method: 'POST',
+      body: JSON.stringify({ dayNumber, exercise1Id, exercise2Id }),
     });
   },
 
